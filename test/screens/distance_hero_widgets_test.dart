@@ -139,4 +139,57 @@ void main() {
     expect(find.text('4'), findsOneWidget);
     await tester.pumpAndSettle();
   });
+
+  testWidgets('drained rest ring can show the re-arm instruction',
+      (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: RestCountdownRing(
+            remainingSeconds: 0,
+            totalSeconds: 5,
+            centerLabel: 'Vào tư thế',
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Vào tư thế'), findsOneWidget);
+    expect(find.text('0'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('hybrid time ring and rep hero fit a small portrait stage',
+      (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: MediaQuery(
+          data: MediaQueryData(size: Size(320, 568)),
+          child: Scaffold(
+            body: SizedBox(
+              width: 320,
+              height: 568,
+              child: Stack(
+                children: [
+                  Center(
+                    child: HoldHeroRing(seconds: 12, targetSeconds: 20),
+                  ),
+                  Positioned(
+                    left: 24,
+                    right: 24,
+                    bottom: 28,
+                    child: IvoryRepHero(repCount: 1, totalReps: 3),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('12'), findsOneWidget);
+    expect(find.text('/3'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }

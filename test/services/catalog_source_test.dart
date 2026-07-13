@@ -44,10 +44,13 @@ void main() {
     expect(plank.volumeLabel, '1 x 3 rep');
   });
 
-  test('hold entry carries seconds, not reps', () {
+  test('hybrid hold entry carries per-hold seconds AND a hold-count reps', () {
+    // Plank-model (07-12): high_plank is hybrid — base_reps is the HOLD COUNT
+    // (3 holds), base_seconds the per-hold duration (20s). volumeLabel still
+    // prefers seconds. Mirrors the prod catalog flip + the bundled JSON.
     final highPlank = source.lookup('high__plank')!; // by definition id
     expect(highPlank.baseSeconds, 20);
-    expect(highPlank.baseReps, isNull);
+    expect(highPlank.baseReps, 3);
     expect(highPlank.volumeLabel, '1 x 20 giây');
   });
 

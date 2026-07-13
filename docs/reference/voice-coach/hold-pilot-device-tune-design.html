@@ -1,0 +1,523 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>High Plank device-tune · 3 fixes · Vika</title>
+<style>
+:root{
+  --ink:#1F1812; --ink-soft:#4A4031; --muted:#8a7c63;
+  --page:#F1E9D9; --raised:#FBF7EE; --line:#E4DAC5; --line-soft:#EEE6D5;
+  --yellow:#FFB701;
+  --code-bg:#211A12; --code-fg:#EDE3CE; --code-dim:#9A8C71; --code-rule:#37291a;
+  --tip:#2E6E63; --tip-bg:#E9F1EE; --tip-line:#BFDBD3;
+  --warn:#A2472B; --warn-bg:#F7EAE2; --warn-line:#E7C6B6;
+  --idea:#8A6608; --idea-bg:#FBF0D6; --idea-line:#EBD69E;
+  --fork:#5B4B86; --fork-bg:#EEEAF5; --fork-line:#CFC4E4;
+  --mono:"JetBrains Mono","SF Mono",Menlo,Consolas,monospace;
+  --sans:"Be Vietnam Pro",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--ink);font-family:var(--sans);line-height:1.62;font-size:16px;-webkit-font-smoothing:antialiased}
+code{font-family:var(--mono);overflow-wrap:anywhere;font-size:.92em}
+h1,h2,h3{line-height:1.18;font-weight:800;letter-spacing:-.01em}
+header.hero{padding:56px 28px 40px;background:radial-gradient(120% 140% at 12% 0%,#2b2117 0%,#1c150e 60%,#160f09 100%);color:#F3ECDD}
+.hero-in{max-width:900px;margin:0 auto}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.24em;text-transform:uppercase;color:var(--yellow);margin:0 0 14px}
+header.hero h1{font-size:clamp(28px,5vw,44px);margin:0 0 14px;color:#FBF7EE}
+header.hero h1 .u{background:linear-gradient(transparent 68%,rgba(255,183,1,.42) 0);padding:0 2px}
+header.hero p.lede{font-size:17px;max-width:74ch;color:#D9CFBD;margin:0 0 26px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font-family:var(--mono);font-size:12px;padding:6px 11px;border-radius:999px;border:1px solid rgba(255,255,255,.16);color:#E8DFCD;background:rgba(255,255,255,.04)}
+.chip b{color:var(--yellow);font-weight:600}
+main{max-width:900px;margin:0 auto;padding:8px 28px 120px}
+section{padding:30px 0;border-top:1px solid var(--line)}
+section:first-of-type{border-top:0}
+.kicker{font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 6px}
+h2{font-size:24px;margin:0 0 14px}
+h3{font-size:17px;margin:22px 0 8px}
+p{margin:10px 0;max-width:78ch}
+ul,ol{max-width:78ch}
+li{margin:5px 0}
+table{border-collapse:collapse;width:100%;margin:14px 0;font-size:14px;background:var(--raised)}
+th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+th{font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;background:var(--line-soft)}
+.code{margin:16px 0;border-radius:10px;overflow:hidden;border:1px solid var(--code-rule)}
+.code-head{font-family:var(--mono);font-size:12px;color:var(--code-dim);background:#191209;padding:8px 14px;border-bottom:1px solid var(--code-rule)}
+.code-body{background:var(--code-bg);color:var(--code-fg);padding:14px 16px;overflow-x:auto}
+.code-body pre{margin:0;font-family:var(--mono);font-size:13px;line-height:1.55}
+.cmt{color:var(--code-dim)}
+.hl{color:var(--yellow)}
+.call{border-radius:10px;padding:12px 16px;margin:16px 0;font-size:14.5px;border:1px solid}
+.call b.t{display:block;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px}
+.call.tip{background:var(--tip-bg);border-color:var(--tip-line)} .call.tip b.t{color:var(--tip)}
+.call.warn{background:var(--warn-bg);border-color:var(--warn-line)} .call.warn b.t{color:var(--warn)}
+.call.idea{background:var(--idea-bg);border-color:var(--idea-line)} .call.idea b.t{color:var(--idea)}
+.fork{border-radius:10px;padding:14px 18px;margin:20px 0;border:1px solid var(--fork-line);background:var(--fork-bg)}
+.fork b.t{display:block;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px;color:var(--fork)}
+.pill{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);background:var(--raised);color:var(--ink-soft);margin-right:6px}
+.pill.core{background:#F7EAE2;border-color:var(--warn-line);color:var(--warn)}
+.pill.glue{background:var(--tip-bg);border-color:var(--tip-line);color:var(--tip)}
+.anchor{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.diag{margin:16px 0;padding:16px;border:1px solid var(--line);border-radius:10px;background:var(--raised);font-family:var(--mono);font-size:13px;white-space:pre;overflow-x:auto;color:var(--ink-soft)}
+</style>
+</head>
+<body>
+<header class="hero">
+<div class="hero-in">
+<p class="eyebrow">Design · Opus → Codex</p>
+<h1>High Plank device-tune — <span class="u">three fixes</span> from the first on-device pass</h1>
+<p class="lede">Annotated design for the three polish calls from the 07-12 High Plank smoke
+(decisions.md "High Plank device-tune"). Fix 1 is a voice-policy determinism patch, Fix 2 is the
+one real CV change (a torso-orientation outer-ring gate), Fix 3 makes the inter-hold re-arm
+reproduce the set-start "get into position" behavior it was always meant to. The Dart is now landed
+in the uncommitted working tree; this doc is the how + the why + the lines most likely wrong.</p>
+<div class="chips">
+<span class="chip"><b>Fix 1</b> milestone always speaks</span>
+<span class="chip"><b>Fix 2</b> horizontality gate · CORE</span>
+<span class="chip"><b>Fix 3</b> re-arm = set-start</span>
+<span class="chip"><b>Fences</b> inner metrics · rep odds · set-start · other exercises</span>
+</div>
+</div>
+</header>
+<main>
+
+<section>
+<p class="kicker">Implementation status · 07-12</p>
+<h2>All three fixes landed; device retest still owns the final verdict</h2>
+<div class="call tip"><b class="t">Code-synced</b>
+Fix 1 uses a hold-milestone-only <code>CueContext.force</code> and deterministically chooses praise or
+hustle before one emit. Fix 2 adds shoulder→hip <code>torsoTiltDeg</code> at entry ≤40° / exit &gt;55°
+and logs it. Fix 3 shares <code>_advanceRestOnClock</code> across pose/no-pose frames and republishes the
+exact set-start <code>setupPosition</code>/<code>holdStill</code> signals during re-arm. The existing delayed
+setup voice therefore speaks once only when stuck; clean re-arms stay quiet until "ba, hai, một."
+Analyze is clean; 119 focused tests pass after the pre-scale safety pass. Real standing/walking/kneeling/sag/pike/side-lying readings
+and leave-frame/pause timing remain device work.</div>
+</section>
+
+<section>
+<p class="kicker">Orientation</p>
+<h2>What the smoke found, and where each fix lands</h2>
+<p>The pilot works end-to-end (3 holds, countdown, both tones, rest re-arm all confirmed in-log).
+These are three polish bugs Nam flagged. Read them against the authoritative record:
+<code>docs/decisions.md</code> "2026-07-12 · High Plank device-tune". The earlier voice-silent ruling
+is superseded: Fix 3 reuses the existing setup voice only for a genuinely stuck re-arm; it adds no line,
+no immediate per-hold intro, and no voice-controller branch.</p>
+<table>
+<thead><tr><th>Fix</th><th>Layer</th><th>File(s)</th><th>Intensity</th></tr></thead>
+<tbody>
+<tr><td>1 · Milestone never lands silent</td><td>Voice policy</td><td><code>lib/voice/voice_policy.dart</code>, <code>voice_content.dart</code>, <code>policy_voice_coach.dart</code></td><td><span class="pill core">core-ish</span> small but shared</td></tr>
+<tr><td>2 · Outer-ring horizontality gate</td><td>CV / state machine</td><td><code>lib/exercise/3.High&nbsp;Plank/high_plank.dart</code></td><td><span class="pill core">CORE</span> designed hardest</td></tr>
+<tr><td>3 · Re-arm reproduces set-start setup</td><td>State machine + UI</td><td><code>high_plank.dart</code>, <code>lib/screens/exercise/active_exercise_page.dart</code></td><td><span class="pill glue">glue-ish</span> reuse, don't invent</td></tr>
+</tbody>
+</table>
+<div class="call tip"><b class="t">Fence clarification — resolved</b>
+<code>lib/exercise/plank/plank.dart</code> is Forearm Plank and stays untouched. The target is
+<code>lib/exercise/3.High Plank/high_plank.dart</code>, which Fixes 2 &amp; 3 must edit (outer ring, state
+machine, no-pose tick). The remaining fences are: don't touch the <b>inner-ring metric files</b>
+(<code>metrics/sagging_metric.dart</code>, <code>piked_hip_metric.dart</code>, <code>elbow_metric.dart</code>,
+<code>timer_metric.dart</code>), don't change <b>set-start's own code</b> in
+<code>exercise_base.dart</code> (<code>checkExerciseState</code>), don't touch <b>other exercises</b>
+or the <b>rep-path praise/hustle odds</b>. Editing <code>high_plank.dart</code> IS the task. Flag if
+you meant something narrower.</div>
+</section>
+
+<!-- ============================ FIX 1 ============================ -->
+<section>
+<p class="kicker">Fix 1 · Voice policy</p>
+<h2>A milestone always speaks an outcome — never silent</h2>
+
+<h3>Concept + why</h3>
+<p>Inside a hold, when the clock crosses a milestone (halfway, final-10s) the coach speaks the
+<b>time line</b> and then an <b>encouragement</b> — praise if the hold has been clean, hustle if it
+has been struggling or is in the final stretch. On device, "Được một nửa rồi" landed in silence and
+felt dead. Nam wants an encouragement <i>every</i> mark. The ruling (decisions.md #1): the time line
+must be followed <b>deterministically</b> by praise OR hustle — no probability miss, no silent slot —
+while keeping the clean→praise / struggling-or-final→hustle switch and never-praise-twice-in-a-row.</p>
+
+<h3>Where the probabilities live, and the two ways today's slot goes silent</h3>
+<p>The <b>time line</b> is <code>CueType.count</code>, which is already deterministic — the fleet
+default is <code>base: 1.0</code>, personality-immune, short-circuiting the roll
+(<code>voice_policy.dart:128</code>, <code>_count</code> at <code>:445</code>). So the number always
+speaks; the bug is purely the follow-up. The praise/hustle <b>odds</b> live in
+<code>kDefaultTuning</code> (<code>praise</code> at <code>:134</code>, <code>hustle</code> at
+<code>:175</code>) and are rolled in <code>_praise</code>/<code>_hustle</code> via
+<code>_rollWithReason</code>. Two independent silent paths exist:</p>
+<div class="code"><div class="code-head">lib/voice/policy_voice_coach.dart · _maybeFireHoldMilestone · L623-647 (current)</div>
+<div class="code-body"><pre>final sinkBusyBeforeCount = _coach.isBusy;
+_coach.say(CueType.count, VoiceContent.key(key),
+    CueContext(repNumber: repNumber, contentKey: id));   <span class="cmt">// time line — deterministic, always fires</span>
+
+final isFinalStretch = threshold &gt;= target * (2 / 3);
+var praised = false;
+if (!_cleanSinceLastHoldMilestone || isFinalStretch) {
+  _coach.say(CueType.hustle, VoiceContent.pool(script.hustlePool),
+      CueContext(repNumber: repNumber, sinkBusy: sinkBusyBeforeCount));   <span class="cmt">// (A) rolled → can MISS</span>
+} else if (!_lastHoldMilestoneWasPraise) {
+  praised = _coach.say(CueType.praise, VoiceContent.pool(script.praisePool),
+      CueContext(repNumber: repNumber, clean: true, formScore: 1.0));     <span class="cmt">// (A) rolled → can MISS</span>
+}                                                                          <span class="cmt">// (B) clean &amp; last-was-praise → NEITHER branch → SILENT</span>
+_lastHoldMilestoneWasPraise = praised;
+_cleanSinceLastHoldMilestone = true;</pre></div></div>
+<ul>
+<li><b>(A) Roll miss.</b> Both <code>say()</code> calls go through <code>_policy.decide</code> and
+roll (<code>praise-roll</code> p≈0.50, <code>hustle-roll</code> p≈0.50). A miss = silence.</li>
+<li><b>(B) Suppressed branch.</b> When the hold is clean (→ praise branch) but the last milestone was
+already praise, the <code>else if (!_lastHoldMilestoneWasPraise)</code> is false → <i>nothing</i>
+runs after the time line.</li>
+<li><b>(C, hidden) Second milestone in one hold.</b> Praise/hustle are outcome cues. The first
+milestone's praise sets <code>_outcomesThisRep = 1</code> for this hold's <code>repNumber</code>; the
+<i>second</i> milestone then trips <code>_canStartOutcome</code>'s
+<code>'second-outcome-slot-is-critical-only'</code> (<code>voice_policy.dart:377</code>) and is
+dropped even if the roll would hit. Another silent path the ruling kills.</li>
+</ul>
+
+<h3>Proposed change (Codex writes the Dart)</h3>
+<p>Two pieces: a <b>deterministic force</b> so the follow-up can't miss or be gated, and a
+<b>call-site precedence</b> that resolves the switch + never-twice into a single guaranteed emit.</p>
+<p><b>1. A hold-milestone-only force flag.</b> Add <code>final bool force</code> (default
+<code>false</code>) to <code>CueContext</code> (<code>voice_content.dart:63</code>, add to the ctor
+and <code>copyWith</code>). In <code>_praise</code> and <code>_hustle</code>, add as the <i>first</i>
+line:</p>
+<div class="code"><div class="code-body"><pre>if (ctx.force) { lastReason = '&lt;type&gt;-forced'; return true; }</pre></div></div>
+<p>Placed first, it bypasses the roll, the never-twice check, <code>_canStartOutcome</code> (so the
+2nd-milestone (C) path fires), and the hustle perishable <code>sinkBusy</code> drop — a true
+guarantee. <code>decide()</code> still calls <code>_onSpoke</code> afterward, so hunger/outcome
+bookkeeping stays consistent. Rep exercises never pass <code>force</code>, so their odds are
+untouched — this is the requirement "do NOT change rep-path praise/hustle odds."</p>
+<p><b>2. Call-site precedence</b> in <code>_maybeFireHoldMilestone</code>. Resolve the choice
+<i>before</i> emitting, then emit once, forced:</p>
+<div class="code"><div class="code-head">policy_voice_coach.dart · replaces L630-646 (described, not final Dart)</div>
+<div class="code-body"><pre>final isFinalStretch = threshold &gt;= target * (2 / 3);
+<span class="cmt">// switch: struggling OR final stretch → hustle; else praise</span>
+var wantHustle = !_cleanSinceLastHoldMilestone || isFinalStretch;
+<span class="cmt">// never-praise-twice: a clean mark whose predecessor already praised → hustle</span>
+if (!wantHustle &amp;&amp; _lastHoldMilestoneWasPraise) wantHustle = true;
+
+if (wantHustle) {
+  _coach.say(CueType.hustle, VoiceContent.pool(script.hustlePool),
+      CueContext(repNumber: repNumber, <span class="hl">force: true</span>, sinkBusy: sinkBusyBeforeCount));
+} else {
+  _coach.say(CueType.praise, VoiceContent.pool(script.praisePool),
+      CueContext(repNumber: repNumber, clean: true, formScore: 1.0, <span class="hl">force: true</span>));
+}
+_lastHoldMilestoneWasPraise = !wantHustle;
+_cleanSinceLastHoldMilestone = true;</pre></div></div>
+<div class="call idea"><b class="t">Answering the precedence question</b>
+Clean-but-last-was-praise → <b>hustle</b> (the never-twice bump). Because the branch is forced,
+there is no roll to miss and no second branch to fall through to — the "fall through to the other"
+the ruling describes collapses into this one bump (praise→hustle). Hustle has no
+never-twice rule and is forced, so it always lands. Determinism proven: exactly one of the two
+always fires.</div>
+<div class="call warn"><b class="t">Lines most likely wrong / to stress-test</b>
+<ul style="margin:6px 0">
+<li><b>Force bypassing <code>_canStartOutcome</code> entirely</b> is the boldest interpretation. It
+means a forced milestone can start even mid-collision-gap. For a hold that's fine (the count line
+plays, the forced line queues after — the sink plays sequentially), but confirm on device the two
+lines don't clip. If Nam wants the collision gap respected, move the force check to <i>after</i>
+<code>_canStartOutcome</code> — but then path (C) resurfaces. I chose full bypass to honor "no silent
+slot"; flag for review.</li>
+<li>A forced praise still writes <code>_lastPraiseRep</code> via <code>_onSpoke</code>. Harmless (we
+track never-twice at the call site via <code>_lastHoldMilestoneWasPraise</code>, not the policy's
+<code>_lastPraiseRep</code>), but note it so a reviewer isn't surprised the two mechanisms coexist.</li>
+<li>Stress-test: a long hold with two milestones — confirm both speak a follow-up (kills path C);
+a clean hold across two consecutive holds — confirm no praise-twice; a struggling hold — confirm
+hustle every mark.</li>
+</ul></div>
+</section>
+
+<!-- ============================ FIX 2 ============================ -->
+<section>
+<p class="kicker">Fix 2 · CV — designed hardest <span class="pill core">CORE</span></p>
+<h2>Outer-ring horizontality gate: a standing user must drop the hold</h2>
+
+<h3>Concept + why</h3>
+<p>The outer anti-cheat ring gates the clock on four angle terms — body (shoulder-hip-ankle), arm,
+knee, and hip-sag. The failure: a person standing or walking around has <b>all four ~180°/low-sag
+too</b>. shoulder-hip-ankle is straight when you stand; arms and knees are straight; there is no sag.
+Geometrically a standing body is indistinguishable from a plank on these terms, so no threshold value
+catches "walked around" — Nam's "tighten the threshold" instinct cannot work. The missing signal is
+<b>torso orientation</b>: a plank torso is <b>horizontal</b>, a standing torso is <b>vertical</b>.
+Add that as another outer-ring exit term.</p>
+
+<h3>Verify the claim in code</h3>
+<div class="code"><div class="code-head">high_plank.dart · _updateStateMachine · L520-546 (current outer ring)</div>
+<div class="code-body"><pre>final isInsideOuterEntry =
+    bodyAngle &gt;= OUTER_ENTRY_BODY_MIN &amp;&amp;   <span class="cmt">// 115°  — straight when STANDING too</span>
+    armAngle  &gt;= OUTER_ENTRY_ARM_MIN  &amp;&amp;   <span class="cmt">// 100°  — straight when standing too</span>
+    kneeAngle &gt;= OUTER_ENTRY_KNEE_MIN &amp;&amp;   <span class="cmt">// 100°  — straight when standing too</span>
+    hipDev    &lt;  OUTER_ENTRY_SAG_MAX;      <span class="cmt">// 0.38  — no sag when standing</span>
+final isOutsideOuterRing =
+    bodyAngle &lt; OUTER_EXIT_BODY_MIN ||   <span class="cmt">// 105°</span>
+    armAngle  &lt; OUTER_EXIT_ARM_MIN  ||   <span class="cmt">// 90°</span>
+    kneeAngle &lt; OUTER_EXIT_KNEE_MIN ||   <span class="cmt">// 90°</span>
+    hipDev    &gt;= OUTER_EXIT_SAG_MAX;     <span class="cmt">// 0.45  — none of these fire when you stand up</span></pre></div></div>
+<p><code>bodyAngle = calculateAngleNormalized(shoulder, hip, ankle)</code>
+(<code>high_plank.dart:441</code>) — a <b>joint angle</b>, invariant to whole-body rotation. Rotating
+a straight body from horizontal to vertical does not change it. Confirmed: standing never trips the
+ring.</p>
+
+<h3>The geometry of the new term</h3>
+<p><b>Torso vector = shoulder → hip</b> (the ruling's landmarks; more robust than shoulder→ankle
+because the ankle is the noisiest/most-occludable point and the trunk is the most direct
+lying-down-vs-upright signal). Measure its <b>angle from horizontal</b> in image space:</p>
+<div class="diag">dx = |shoulder.x − hip.x|        (horizontal extent of the torso)
+dy = |shoulder.y − hip.y|        (vertical extent; image Y is DOWN)
+torsoTiltDeg = atan2(dy, dx) · 180/π
+
+   PLANK  ┌─ shoulder ──────── hip ─┐   dx ≫ dy   → torsoTiltDeg ≈ 0–25°   (horizontal)
+   STAND     shoulder                    dx ≈ 0
+                │                        dy ≫ dx   → torsoTiltDeg ≈ 70–90° (vertical)
+                hip</div>
+<p>Why this form is robust for a <b>side-on landscape</b> exercise:</p>
+<ul>
+<li><b>Scale-invariant.</b> <code>atan2(dy,dx)</code> is a pure ratio — body size and
+<code>scaleFactor</code> are irrelevant, so no normalization needed and no cross-body drift.</li>
+<li><b>Camera-facing-invariant.</b> <code>landscapeLeft</code> vs <code>landscapeRight</code> flips
+the X sign; the <code>abs()</code> on both deltas cancels it. No <code>cameraFacing</code> branch.</li>
+<li><b>Already proven in this file.</b> The START gate uses the identical idea —
+<code>isHorizontal = dx &gt; dy * 1.2</code> on shoulder→ankle (<code>high_plank.dart:296-300</code>) —
+and start detection works on device. That validates the coordinate convention (Y down, torso genuinely
+dx≫dy in a plank) empirically. We're lifting the same proven pattern into the outer ring, on the torso
+segment, expressed as an angle for a clean threshold.</li>
+</ul>
+<div class="code"><div class="code-head">high_plank.dart · reused START-gate precedent · L296-300</div>
+<div class="code-body"><pre><span class="cmt">// Cơ thể nằm ngang (khoảng cách X lớn hơn Y)</span>
+double dx = (shoulder.x - ankle.x).abs();
+double dy = (shoulder.y - ankle.y).abs();
+bool isHorizontal = dx &gt; dy * 1.2;   <span class="cmt">// ← same principle, START only, not in the ring</span></pre></div></div>
+
+<h3>Thresholds + hysteresis, and how it composes</h3>
+<p>Add two config constants and fold the term into the existing entry/exit booleans. The existing
+frame hysteresis (4-frame <code>_holdingDebouncer</code> on entry, 2-frame
+<code>_droppingDebouncer</code> on exit) is untouched; the entry/exit <b>value</b> split gives the
+angular hysteresis band:</p>
+<table>
+<thead><tr><th>Constant</th><th>Value</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>OUTER_ENTRY_TORSO_TILT_MAX</code></td><td>40°</td><td>To (re)enter the hold the torso must be within 40° of horizontal (AND into <code>isInsideOuterEntry</code>).</td></tr>
+<tr><td><code>OUTER_EXIT_TORSO_TILT_MAX</code></td><td>55°</td><td>Torso beyond 55° of horizontal drops the hold (OR into <code>isOutsideOuterRing</code>).</td></tr>
+</tbody>
+</table>
+<p>Compute <code>torsoTiltDeg</code> in <code>checkingPose</code> alongside the other angles
+(<code>high_plank.dart:441-446</code>), pass it into <code>_updateStateMachine</code> as a new param,
+and add:</p>
+<div class="code"><div class="code-body"><pre>isInsideOuterEntry  = ...existing... &amp;&amp; torsoTiltDeg &lt;= OUTER_ENTRY_TORSO_TILT_MAX;
+isOutsideOuterRing  = ...existing... || torsoTiltDeg &gt;  OUTER_EXIT_TORSO_TILT_MAX;</pre></div></div>
+<p>Adding to <b>both</b> entry and exit is deliberate: a standing user can neither start nor continue
+a hold. The entry term also correctly gates re-arm (which reuses <code>confirmedOuterPose</code>, see
+Fix 3) — you cannot re-arm the hold while standing.</p>
+
+<h3>Why 40/55 tolerates the worst legal plank</h3>
+<p>The widest a legal plank's <b>torso</b> tilts is a deep sag or a high pike. A sag at the outer-ring
+limit is <code>hipDev ≈ 0.45</code> of a torso length in Y; over a torso that's
+<code>atan(0.45) ≈ 24°</code>. A pike is symmetric. So worst legal ≈ 24–30°, comfortably under the 40°
+entry. Standing is 70–90°, far past the 55° exit. The 15° band between 40 and 55 (plus the frame
+debouncers) absorbs jitter without flip-flop.</p>
+<div class="call warn"><b class="t">Assumptions most likely wrong — the CORE risk list</b>
+<ul style="margin:6px 0">
+<li><b>#1 (riskiest): the sag→tilt coupling.</b> I assumed a legal deep sag keeps the shoulder→hip
+torso near-horizontal. But sag drops the HIP; if the shoulders also drop or the hip landmark is read
+low, the torso segment itself could tilt more than my 24° estimate. If a real sagging plank tilts
+past 40° the user would be wrongly ejected. <b>Stress-test the sag case first and hardest</b>; if the
+torso tilts more than expected, raise ENTRY to ~45–50° (there's a huge 20°+ margin to standing, so
+loosening is safe). Do NOT go the other way and tighten toward standing.</li>
+<li><b>#2 landmark noise on a short segment.</b> shoulder→hip is shorter than shoulder→ankle, so
+<code>atan2</code> jitters more per pixel of landmark noise. Mitigations already in place: One-Euro
+smoothing upstream, the confidence gate (<code>isLandmarkConfident</code> on all six landmarks,
+<code>high_plank.dart:291-294,420-425</code>), and the 4/2-frame debouncers. If it still jitters near
+the band, widen the band, don't add new smoothing.</li>
+<li><b>#3 side-lying flat.</b> Lying on your side has a horizontal torso → this term will NOT drop it.
+That's expected and correct: the orientation gate only targets <i>vertical</i> torsos. Side-lying is
+caught by <code>_hasFloorSupport</code> / arm-vertical-lift, not here. Don't try to make one term do
+both.</li>
+<li><b>#4 which landmarks in the pair.</b> ML Kit gives left+right shoulder/hip; the existing code
+already resolves a single <code>shoulder</code>/<code>hip</code> via <code>_getLandmarks</code> (the
+camera-facing-nearer side). Reuse those exact resolved landmarks — do not re-pick.</li>
+</ul></div>
+<div class="call idea"><b class="t">On-device stress matrix</b>
+Standing still in frame (must drop) · walking across frame (must drop) · kneeling upright, torso
+vertical (must drop) · deep <i>legal</i> sag (must NOT drop — assumption #1) · high pike (must NOT
+drop) · side-lying flat (will NOT drop — expected) · partial/occluded lower body (confidence gate
+handles) · standing→plank transition (re-arm must re-enter cleanly). Log <code>torsoTiltDeg</code>
+in the existing diagnostic dump (<code>high_plank.dart:392-396</code>) so the band can be tuned from
+real numbers.</div>
+<div class="call tip"><b class="t">Fences held</b>
+This touches ONLY the outer ring in <code>high_plank.dart</code> + two new
+<code>HighPlankConfig</code> constants. It does not read or change the inner-ring form metrics
+(sagging/piked/elbow/timer), the START gate, or any other exercise.</div>
+</section>
+
+<!-- ============================ FIX 3 ============================ -->
+<section>
+<p class="kicker">Fix 3 · State machine + UI</p>
+<h2>Re-arm reproduces the set-start "get into position" behavior</h2>
+
+<h3>Concept + why</h3>
+<p>Not a new feature and not a new line — <b>reuse set-start's <code>setup_position</code> machinery
+whole, UI <i>and its voice</i></b>. The re-arm between holds must behave <b>exactly</b> like the very
+start: once the user is in frame + correctly oriented but not yet in the pose, the existing "get into
+position" UI + its voice fire (set-start's stuck-user behavior); if the user is already posed at
+re-arm, straight to "ba, hai, một" — no get-into-position prompt. Two impl regressions break that
+reproduction.</p>
+<div class="call idea"><b class="t">Constraint REVERSED (Nam, supersedes the round-2 voice-silent ruling)</b>
+The earlier "re-arm stays voice-silent" ruling is <b>gone</b> (decisions.md "High Plank device-tune"
+#3/#4 supersede it). Nam: "utilize what we already have — the UI that says get into position and the
+voice that goes with it; don't introduce anything else; just make that UI and voice work correctly
+after a break." The elegance is that the setup_position voice is a <b>delayed stuck-user re-tell</b>,
+so it fires only when the user actually needs the prompt — never on a clean per-hold re-arm, so no
+spam. That anti-spam property is <i>why</i> reusing set-start's machinery is the right answer rather
+than a new line or an immediate re-tell.</div>
+
+<h3>Bug (a): rest freezes when the user leaves the frame</h3>
+<p>The <code>resting → reArming</code> transition lives inside <code>_updateStateMachine</code>, which
+runs only inside <code>checkingPose</code> → <code>processPose</code> → and only when a pose is
+present. There is <b>no pose-independent tick</b>: the page picks <code>processPose</code> OR
+<code>processNoPoseFrame</code> per frame (confirmed in <code>exercise_base.dart</code>; the two are
+mutually exclusive, chosen at <code>active_exercise_page.dart:1191-1198</code> and
+<code>:1497-1504</code>). So if the user walks off during rest, only
+<code>processNoPoseFrame</code> runs — and High Plank's override does nothing to the rest clock:</p>
+<div class="code"><div class="code-head">high_plank.dart · L350-355 (current no-pose override) + L547-551 (rest advance)</div>
+<div class="code-body"><pre>Map&lt;String, String&gt; processNoPoseFrame() {
+  _interruptActiveHold('wall_guard');   <span class="cmt">// no-op unless holding</span>
+  _interruptReArm();                    <span class="cmt">// no-op unless reArming</span>
+  return super.processNoPoseFrame();    <span class="cmt">// gate + guidance only — never advances _restStartMs</span>
+}
+<span class="cmt">// the ONLY place rest completes — pose-gated, unreachable when the user is absent:</span>
+} else if (state == HighPlankState.resting &amp;&amp; _restStartMs != null) {
+  final restSeconds = (now - _restStartMs!) / 1000.0;
+  if (restSeconds &gt;= HighPlankConfig.REST_DURATION_SECONDS) {
+    _transitionState(HighPlankState.reArming, now);
+  }
+}</pre></div></div>
+<p>Result: leave the frame during rest → machine stuck in <code>resting</code>, ring frozen at 0.</p>
+<p><b>Fix (a):</b> drive rest completion on a pose-independent time check. In the
+<code>processNoPoseFrame</code> override, after <code>super.processNoPoseFrame()</code> (which
+refreshes <code>frameTimestamp</code> via <code>DateTime.now()</code> and publishes the correct
+absent-user guidance), run the <i>same</i> resting→reArming wall-clock check the state machine uses.
+Extract it into a tiny shared helper — e.g. <code>_advanceRestOnClock(int now)</code> — called from
+both the <code>resting</code> branch of <code>_updateStateMachine</code> and the no-pose override, so
+there is one rest-completion rule. Because rest is a pure timer keyed off <code>_restStartMs</code>
+and wall-clock <code>frameTimestampMs</code>, it counts down correctly whether or not a pose is
+present. When it completes to <code>reArming</code> while the user is still away, the base's
+guidance (searching / body-in-frame) keeps telling them to get back in frame — which is exactly what
+set-start does when you're absent.</p>
+<div class="call warn"><b class="t">Interaction to verify — the presence-gate pause</b>
+When a person is lost for long enough, the base's presence gate (<code>_gate.onNoPose</code>) may
+declare a pause and demand a re-hold on return (<code>_beginPauseReactivationIfNeeded</code>). That
+overlaps with our rest→reArming advance — both converge on "get back into position," so they're
+probably compatible, but this is the one place two state owners meet. <b>Stress-test: leave the frame
+mid-rest for 3s, 10s, 30s and confirm</b> the machine lands in a clean reArming (or pause-reactivation)
+that then plays 3-2-1 once — not a double countdown or a wedged state. If they fight, gate the
+rest-advance on "not paused" and let the pause flow own the long-absence case.</div>
+
+<h3>Bug (b): guidance hides the re-arm "get into position"</h3>
+<p>The pre-fix re-arm get-into-position was a bespoke drained ring label gated by
+<code>guidanceCopy == null</code>. The current code deletes that unreachable label call and routes the posed
+3-2-1 through the live <code>RestCountdownRing</code>:</p>
+<div class="code"><div class="code-head">active_exercise_page.dart · L2188-2213 (current re-arm ring)</div>
+<div class="code-body"><pre>if (widget.isTimeBased &amp;&amp; activeState &amp;&amp;
+    <span class="hl">guidanceCopy == null</span> &amp;&amp;                 <span class="cmt">// ← ANY guidance line hides the re-arm ring</span>
+    !(isReArming &amp;&amp; reArmProgress != null))
+  Center(child: AnimatedSwitcher( ...
+    child: holdRestRemaining != null || isReArming
+        ? RestCountdownRing(
+            remainingSeconds: reArmCounting
+                ? total * (1 - reArmProgress)
+                : holdRestRemaining ?? 0,
+            totalSeconds: reArmCounting ? total : _restRingTotalSeconds)
+        : HoldHeroRing(...)));</pre></div></div>
+<p>Guidance now owns the not-posed stage; once pose confirmation starts, lineless hold guidance exposes this
+ring and the countdown. Transient body-in-frame or side-orientation guidance therefore cannot leave a dead
+"Vào tư thế" ring competing for the center.</p>
+<p><b>How set-start actually does it (the machinery to mirror).</b> Set-start does not use a bespoke
+ring. It publishes a single <code>GuidanceSignal</code> through one priority slot:</p>
+<div class="diag">mis-oriented        → gate blocks, publishes turnSide, processPose early-returns   (banner: "Đứng nghiêng")
+in-frame, not posed  → checkExerciseState publishes GuidanceSignal.setupPosition     (banner: "Vào vị trí")
+in position, holding  → publishes holdStill (maps to guidanceCopy == null)           → _CenterOverlay 3-2-1 ring
+3s held               → activated / hold begins</div>
+<p>The priority is automatic: a single <code>guidanceSignal</code> slot, cleared every frame, and a
+bad orientation early-returns <i>before</i> <code>checkExerciseState</code> ever publishes
+setupPosition (<code>exercise_base.dart:540-542</code> vs <code>:561</code>). So turnSide naturally
+wins over setupPosition, and setupPosition only appears when framing/orientation are already good.</p>
+<p><b>Fix (b) — reuse that machinery instead of the bespoke ring, voice included.</b> During
+<code>reArming</code>, when the user is <i>not yet in the pose</i> (the re-arm hold hasn't started —
+<code>activationProgress == null</code> / <code>_reArmHoldStartMs == null</code>), publish
+<code>GuidanceSignal.setupPosition('Vào vị trí', 'Vào tư thế và giữ yên để bắt đầu.')</code> from
+High Plank's own path (right after <code>_updateStateMachine</code> in <code>checkingPose</code>) —
+the <i>same signal, same copy</i> as set-start's <code>exercise_base.dart:878-883</code>. Once the
+user is posed and the re-arm hold-still starts, publish <code>GuidanceSignal.holdStill(...)</code>
+(copy maps to <code>null</code>) — again mirroring set-start's sequence. Then everything else already
+works:</p>
+<ul>
+<li><b>UI.</b> The existing set-start UI renders both identically:
+<code>_currentGuidanceCopy</code> maps <code>setupPosition</code> → the "Vào vị trí" banner
+(<code>active_exercise_page.dart:2550</code>) and <code>holdStill</code> → <code>null</code>
+(<code>:2557</code>), so once posed the existing <code>_CenterOverlay</code> hold branch renders the
+3-2-1 (it already maps re-arm-with-progress to <code>_LiveOverlayState.hold</code>, <code>:2473-2475</code>).
+No new widget. The bespoke <code>centerLabel: 'Vào tư thế'</code> ring becomes dead code (setupPosition
+makes <code>guidanceCopy</code> non-null, so its <code>guidanceCopy == null</code> guard hides it) —
+flag it, don't delete unless Nam confirms.</li>
+<li><b>Voice — this is the part that just falls out.</b> The setup-voice producer
+(<code>_SetupSafetyVoiceController.processFrame</code>) is <b>signal-driven</b>, not state-scoped:
+<code>activeClass = _classForSignal(exercise.guidanceSignal)</code> (<code>policy_voice_coach.dart:1287-1288</code>),
+and it runs every frame including during a hold set. So the instant the guidance signal is
+<code>setupPosition</code>, its <b>stuck-user re-tell</b> latch is live at re-arm too — no change to
+the voice machinery at all. The re-tell is <b>delayed</b> (<code>_recueMs = 10s</code>,
+<code>:1219</code>, floored at intro-audio-end which is already stamped from set-start), so a clean
+per-hold re-arm (user posed within the delay → signal clears) stays <b>silent</b>, and only a genuinely
+stuck user hears "Vào vị trí." That IS the anti-spam property Nam wants, for free.</li>
+<li><b>Already posed → straight to countdown.</b> The activation countdown
+(<code>_handleActivationCountdown</code>) is already reArming-aware —
+<code>inActivationContext = notActivated || isReArmingHold</code> (<code>:439-441</code>) — so
+"ba, hai, một" fires at re-arm with no change. A user already posed publishes no setupPosition signal,
+so no get-into-position voice; they go straight to the count. Exactly set-start's behavior.</li>
+<li><b>Priority for free.</b> Mis-oriented / partial-body → the gate blocks and
+<code>processPose</code> early-returns before <code>checkingPose</code>
+(<code>exercise_base.dart:540-542</code>), so setupPosition is never published that frame — the
+orientation banner shows, exactly as at set-start.</li>
+</ul>
+<div class="call tip"><b class="t">Does the setup_position producer widen cleanly? YES — this is the answer to the "same machinery" test</b>
+The <b>voice</b> producer needs <b>no widening</b>: it already keys off the guidance signal, so it is
+reachable from the activated/reArming state the moment the signal is present. The only code change is
+High Plank <b>re-emitting the same <code>GuidanceSignal.setupPosition</code>/<code>holdStill</code></b>
+from its reArming path — which touches neither <code>checkExerciseState</code> nor the base setup
+machinery, so <b>set-start behavior is unchanged</b>. The intro voice
+(<code>_fireSetupIntro</code>) stays latched to set-start (<code>isSetStart</code>) — we deliberately
+do NOT re-fire it, because the immediate first-tell would spam every re-arm; the delayed re-tell is
+the right voice.</div>
+<div class="call warn"><b class="t">The thing Codex most needs to get right + PUSH BACK</b>
+<ul style="margin:6px 0">
+<li><b>Latch re-arm + delay timing (the real risk).</b> The stuck-setup latch fired once at set-start
+(if the user was slow). It must <b>re-arm on the re-arm presence edge</b> and time its 10s delay from
+<i>there</i>, so: a fast re-arm stays silent, a stuck re-arm speaks after ~10s (not instantly, not
+never). Verify the <code>_SteadyStateLatch</code> resets when the setupPosition signal goes
+absent→present again between set-start and re-arm. <b>Stress-test on device</b>: clean re-arm (silent),
+stuck re-arm &gt;10s (one "Vào vị trí"), several holds in a row (no accumulation / no double-speak).</li>
+<li><b>Do NOT widen <code>checkExerciseState</code>.</b> The tempting alternative — letting the base's
+<code>notActivated</code> branch also run during reArming — mutates <code>exerciseState</code> and
+<code>_holdStillStartedAt</code> and fights High Plank's sub-machine. <b>That</b> would leak into
+set-start semantics. Re-emit the signal from High Plank instead; leave the base producer alone.</li>
+<li><b>Grace/re-tell-floor guards (<code>:236-239</code>).</b> That block excludes reArming/resting
+from <code>beginGuidanceSignalGrace</code>. Since there's no re-arm intro to protect and
+<code>_introAudioEndMs</code> is already stamped, the re-tell floor should be satisfied without
+touching it — but if device testing shows the re-tell blocked, the minimal relax is to let the
+re-tell floor apply during reArming. Flag before changing it.</li>
+</ul></div>
+</section>
+
+<section>
+<p class="kicker">Handoff</p>
+<h2>What Codex gets, what stays fenced</h2>
+<p>The Codex work order is <code>docs/scratch/hold-pilot-device-tune-codex-spec.md</code> (goal +
+current-state evidence + suggested approach + fences + report-back). Fences, restated:
+<b>inner-ring metric files</b>, <b>rep-path praise/hustle odds</b> (only the new
+<code>force</code> flag, never the tunings), <b>other exercises</b>, <b>set-start's own code</b> in
+<code>exercise_base.dart</code>. Editing <code>high_plank.dart</code> and the two named voice files
+is in-scope; the <code>plank.dart</code> in the brief's fence list is read as the metric files +
+set-start machinery (flagged above for Nam).</p>
+</section>
+
+</main>
+</body>
+</html>

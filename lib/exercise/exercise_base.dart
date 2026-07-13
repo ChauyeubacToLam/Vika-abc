@@ -19,7 +19,6 @@ import '../utils/exercise_logger.dart';
 export 'package:vika/utils/hold_seconds_accumulator.dart';
 import '../debug/debug_types.dart';
 import '../services/generic_exercise_voice_assets.dart';
-import '../services/queued_asset_voice_player.dart';
 import '../services/viettel_tts_service.dart';
 import '../voice/policy_voice_coach.dart';
 import '../voice/voice_coach.dart';
@@ -52,6 +51,22 @@ const double SCALE_EMA_ALPHA = 0.1;
 enum ExerciseState { notActivated, activated, completed }
 
 enum CameraFacing { front, left, right, angled, undefined }
+
+// Rep-counted holds currently bridge exercise-owned enums to the shared voice
+// adapter through String phase keys. Keep the temporary naming contract in one
+// place until the hold engine owns a typed phase model.
+const String REP_COUNTED_HOLD_PHASE_SETUP = 'setup';
+const String REP_COUNTED_HOLD_PHASE_HOLDING = 'holding';
+const String REP_COUNTED_HOLD_PHASE_DROPPING = 'dropping';
+const String REP_COUNTED_HOLD_PHASE_RESTING = 'resting';
+const String REP_COUNTED_HOLD_PHASE_RE_ARMING = 'reArming';
+const Set<String> REP_COUNTED_HOLD_PHASE_KEYS = <String>{
+  REP_COUNTED_HOLD_PHASE_SETUP,
+  REP_COUNTED_HOLD_PHASE_HOLDING,
+  REP_COUNTED_HOLD_PHASE_DROPPING,
+  REP_COUNTED_HOLD_PHASE_RESTING,
+  REP_COUNTED_HOLD_PHASE_RE_ARMING,
+};
 
 enum GuidanceClass {
   phoneLandscape,
@@ -222,6 +237,10 @@ abstract class ExerciseBase {
   int repCount = 0;
   bool _reactivatingAfterPause = false;
 
+  /// Launch-flow context for the structural completion cue. A direct launch is
+  /// a single final set; the multi-set screen stamps earlier fresh sets false.
+  bool isFinalSet = true;
+
   /// The per-set target(s) this exercise was launched with, injected at
   /// construction by the launch screen's resolved volume (prescription >
   /// catalog > floor — see `_ExerciseExperienceSpec._resolveVolume`). Kept on
@@ -389,6 +408,12 @@ abstract class ExerciseBase {
     if (startedAt == null) return null;
     return frameTimestamp.difference(startedAt).inMilliseconds;
   }
+
+  /// True while a rep-counted hold is re-earning its start position between
+  /// holds. The base activation state stays `activated`; exercises opt in so
+  /// the shared countdown and gauge can follow their re-arm clock without
+  /// replaying any set-start lifecycle behavior.
+  bool get isReArmingHold => false;
 
   ExerciseBase({this.targetReps, this.targetSeconds, PresenceGate? gate})
       : _gate = gate ?? PresenceGate(diagnosticMode: kDiagnosticMode) {
@@ -627,18 +652,34 @@ abstract class ExerciseBase {
     // both script types map fault ids to '<slug>.<id>' asset keys.
     final legacy =
         GenericExerciseVoiceAssets.scriptForExerciseName(exerciseName);
-    final bundle = liveHoldTargetSeconds != null
-        ? VoiceDefaults.timeBased
-        : VoiceDefaults.repBased;
+    final isRepCountedHold = usesRepCountedHolds;
+    final bundle = isRepCountedHold
+        ? VoiceDefaults.repCountedHold
+        : liveHoldTargetSeconds != null
+            ? VoiceDefaults.timeBased
+            : VoiceDefaults.repBased;
     final script = VoiceScript.from(
       bundle,
       slug: legacy.slug,
       faultIds: legacy.faultIds,
+      reminderPools: isRepCountedHold
+          ? <String, List<String>>{
+              for (final id in legacy.faultIds)
+                id: <String>['${legacy.slug}.${id}_reminder'],
+            }
+          : const <String, List<String>>{},
+      hustleFinalPool: isRepCountedHold
+          ? VoiceLib.hustleRepCountedHoldFinal
+          : const <String>[],
+      repStartPhaseKeys: isRepCountedHold
+          ? const <String>{REP_COUNTED_HOLD_PHASE_HOLDING}
+          : const <String>{},
     );
     return PolicyVoiceCoach(
       script: script,
       coach: VoiceCoach(sink: AssetVoiceSink()),
-      countsByRepNumber: liveHoldTargetSeconds == null,
+      targetReps: targetReps,
+      countsByRepNumber: liveHoldTargetSeconds == null || isRepCountedHold,
     );
   }
 
@@ -920,897 +961,19 @@ abstract class ExerciseBase {
   /// Optional target used by the shared hold timer UI.
   double? get liveHoldTargetSeconds => null;
 
+  /// Remaining seconds in an in-set rest, or null outside the timed rest.
+  double? get liveRestSeconds => null;
+
+  /// Optional target used by the shared in-set rest ring.
+  double? get liveRestTargetSeconds => null;
+
+  /// True only when one completed hold is one rep. Most exercises that expose
+  /// a live hold timer are still ordinary rep/timer exercises and must keep
+  /// their existing voice behavior.
+  bool get usesRepCountedHolds => false;
+
   /// Faults known so far in the rep-in-progress, exposed the instant a
   /// metric detects them. Exercises that do not opt in keep the post-rep
   /// RepLog voice path.
   List<FaultRecord> get liveFaults => const [];
-}
-
-class _GenericAssetVoicePlayer {
-  _GenericAssetVoicePlayer()
-      : _player = QueuedAssetVoicePlayer(
-          assetMap: GenericExerciseVoiceAssets.commonFiles,
-          assetSourcePrefix: GenericExerciseVoiceAssets.assetSourcePrefix,
-          assetBundlePrefix: GenericExerciseVoiceAssets.assetBundlePrefix,
-          assetResolver: GenericExerciseVoiceAssets.resolveAsset,
-          logTag: 'GenericExerciseVoice',
-        );
-
-  final QueuedAssetVoicePlayer _player;
-
-  Future<void> speak(String text) => _player.speak(text);
-  Future<void> waitUntilIdle({required Duration timeout}) =>
-      _player.waitUntilIdle(timeout: timeout);
-  void clearQueue() => _player.clearQueue();
-  void clearPendingButKeepCurrent() => _player.clearPendingButKeepCurrent();
-  void dispose() => _player.dispose();
-}
-
-// ignore: unused_element
-class _GenericExerciseVoiceCoach implements ExerciseVoiceCoach {
-  static final Map<String, Map<String, int>> _previousSetFaultsBySlug = {};
-  static const int _noCountCueCooldownMs = 1200;
-  static const int _holdFaultCueCooldownMs = 2500;
-  static const int _holdStallFramesBeforeCue = 4;
-  static const double _holdProgressEpsilonSeconds = 0.05;
-
-  final _GenericAssetVoicePlayer _voicePlayer = _GenericAssetVoicePlayer();
-  final Map<String, int> _setFaultCounts = {};
-
-  int _lastRepCount = 0;
-  int _lastNoCountCueAtMs = 0;
-  int _lastHoldFaultCueAtMs = 0;
-  int _holdStallFrames = 0;
-  int? _lastOutcomeRepNumber;
-  double? _lastLiveHoldSeconds;
-  bool _didAnnounceReady = false;
-  bool _didSpeakSetup = false;
-  bool _didSpeakPreviousSetAdvice = false;
-  bool _didAnnounceSetComplete = false;
-
-  @override
-  void processFrame({
-    required ExerciseBase exercise,
-    required int repCount,
-    required bool hasPose,
-    required Map<String, String> feedback,
-  }) {
-    final script =
-        GenericExerciseVoiceAssets.scriptForExerciseName(exercise.exerciseName);
-    final repIncreased = repCount > _lastRepCount;
-    final isHoldTimerExercise = exercise.liveHoldTargetSeconds != null;
-
-    if (exercise.exerciseState == ExerciseState.completed) {
-      if (!_didAnnounceSetComplete) {
-        _voicePlayer.clearPendingButKeepCurrent();
-        if (repIncreased) {
-          final completedRepLog = _latestRepLog(exercise, repCount);
-          final latestRepLog = _latestRepLogAnyNumber(exercise);
-          if (completedRepLog != null &&
-              completedRepLog.repNumber != _lastOutcomeRepNumber) {
-            _speakRepLogOutcome(
-              script: script,
-              repLog: completedRepLog,
-              includeCount: true,
-            );
-          } else if (isHoldTimerExercise &&
-              latestRepLog != null &&
-              latestRepLog.repNumber != _lastOutcomeRepNumber) {
-            _speakRepLogOutcome(
-              script: script,
-              repLog: latestRepLog,
-              includeCount: false,
-            );
-          } else if (completedRepLog == null && latestRepLog == null) {
-            _speakUnknownRepOutcome(
-              script: script,
-              repCount: repCount,
-              feedback: feedback,
-            );
-          }
-        } else if (isHoldTimerExercise) {
-          final latestRepLog = _latestRepLogAnyNumber(exercise);
-          if (latestRepLog != null &&
-              latestRepLog.repNumber != _lastOutcomeRepNumber) {
-            _speakRepLogOutcome(
-              script: script,
-              repLog: latestRepLog,
-              includeCount: false,
-            );
-          }
-        }
-        _voicePlayer.speak('common.exercise_complete');
-        _previousSetFaultsBySlug[script.slug] = Map.of(_setFaultCounts);
-        _didAnnounceSetComplete = true;
-      }
-      _lastRepCount = repCount;
-      return;
-    }
-
-    if (exercise.exerciseState == ExerciseState.notActivated) {
-      _speakSetup(exercise, script);
-      _lastRepCount = repCount;
-      return;
-    }
-
-    if (exercise.exerciseState != ExerciseState.activated ||
-        exercise.isPaused ||
-        !hasPose) {
-      _lastRepCount = repCount;
-      _resetHoldProgressTracking();
-      return;
-    }
-
-    if (!_didAnnounceReady) {
-      _voicePlayer.speak('common.ready');
-      _didAnnounceReady = true;
-      _speakPreviousSetAdviceIfNeeded(exercise, script);
-    }
-
-    if (isHoldTimerExercise) {
-      _handleHoldTimerProgress(
-        script: script,
-        exercise: exercise,
-        feedback: feedback,
-      );
-
-      if (repIncreased && _latestRepLog(exercise, repCount) == null) {
-        _lastRepCount = repCount;
-        return;
-      }
-    }
-
-    if (!repIncreased && _isNoCountFeedback(feedback)) {
-      final nowMs = DateTime.now().millisecondsSinceEpoch;
-      if (nowMs - _lastNoCountCueAtMs >= _noCountCueCooldownMs) {
-        _voicePlayer.clearPendingButKeepCurrent();
-        _voicePlayer.speak('common.no_count');
-        final faultId = _faultIdForFeedback(script, feedback);
-        if (faultId != null) {
-          _setFaultCounts[faultId] = (_setFaultCounts[faultId] ?? 0) + 1;
-          _voicePlayer.speak(script.faultKey(faultId));
-        } else if (_feedbackIndicatesFault(feedback)) {
-          _voicePlayer.speak('common.fix_pose');
-        }
-        _lastNoCountCueAtMs = nowMs;
-      }
-      _lastRepCount = repCount;
-      return;
-    }
-
-    if (repIncreased) {
-      final completedRepLog = _latestRepLog(exercise, repCount);
-      _voicePlayer.clearPendingButKeepCurrent();
-      if (completedRepLog != null) {
-        _speakRepLogOutcome(
-          script: script,
-          repLog: completedRepLog,
-          includeCount: true,
-        );
-      } else {
-        _speakUnknownRepOutcome(
-          script: script,
-          repCount: repCount,
-          feedback: feedback,
-        );
-      }
-      _lastRepCount = repCount;
-      return;
-    }
-
-    _lastRepCount = repCount;
-  }
-
-  void _handleHoldTimerProgress({
-    required GenericExerciseVoiceScript script,
-    required ExerciseBase exercise,
-    required Map<String, String> feedback,
-  }) {
-    final liveHoldSeconds = exercise.liveHoldSeconds;
-    if (liveHoldSeconds == null) {
-      _resetHoldProgressTracking();
-      return;
-    }
-
-    final targetSeconds = exercise.liveHoldTargetSeconds;
-    if (targetSeconds != null &&
-        liveHoldSeconds >= targetSeconds - _holdProgressEpsilonSeconds) {
-      _lastLiveHoldSeconds = liveHoldSeconds;
-      _holdStallFrames = 0;
-      return;
-    }
-
-    final previous = _lastLiveHoldSeconds;
-    _lastLiveHoldSeconds = liveHoldSeconds;
-    if (previous == null ||
-        liveHoldSeconds > previous + _holdProgressEpsilonSeconds) {
-      _holdStallFrames = 0;
-      return;
-    }
-
-    _holdStallFrames++;
-    if (_holdStallFrames < _holdStallFramesBeforeCue) {
-      return;
-    }
-
-    final nowMs = DateTime.now().millisecondsSinceEpoch;
-    if (nowMs - _lastHoldFaultCueAtMs < _holdFaultCueCooldownMs) {
-      return;
-    }
-
-    final faultId = _faultIdForFeedback(script, feedback);
-    if (faultId != null) {
-      _voicePlayer.clearPendingButKeepCurrent();
-      _speakFaultId(script, faultId);
-      _lastHoldFaultCueAtMs = nowMs;
-      return;
-    }
-
-    if (_feedbackIndicatesFault(feedback)) {
-      _voicePlayer.clearPendingButKeepCurrent();
-      _voicePlayer.speak('common.fix_pose');
-      _lastHoldFaultCueAtMs = nowMs;
-    }
-  }
-
-  void _resetHoldProgressTracking() {
-    _lastLiveHoldSeconds = null;
-    _holdStallFrames = 0;
-  }
-
-  void _speakSetup(
-    ExerciseBase exercise,
-    GenericExerciseVoiceScript script,
-  ) {
-    if (_didSpeakSetup) return;
-    _voicePlayer.speak(exercise.setupOrientationIntroVoiceKey);
-    _voicePlayer.speak(script.cueKey('setup_position'));
-    _voicePlayer.speak(script.cueKey('active_intro'));
-    _speakPreviousSetAdviceIfNeeded(exercise, script);
-    _didSpeakSetup = true;
-  }
-
-  void _speakUnknownRepOutcome({
-    required GenericExerciseVoiceScript script,
-    required int repCount,
-    required Map<String, String> feedback,
-  }) {
-    _lastOutcomeRepNumber = repCount;
-    _voicePlayer.speak('$repCount');
-
-    final faultId = _faultIdForFeedback(script, feedback);
-    if (faultId != null) {
-      _speakFaultId(script, faultId);
-      return;
-    }
-
-    _voicePlayer.speak(
-      _feedbackIndicatesFault(feedback) ? 'common.fix_pose' : 'common.correct',
-    );
-  }
-
-  void _speakRepLogOutcome({
-    required GenericExerciseVoiceScript script,
-    required RepLog repLog,
-    required bool includeCount,
-  }) {
-    _lastOutcomeRepNumber = repLog.repNumber;
-    if (includeCount) {
-      _voicePlayer.speak('${repLog.repNumber}');
-    }
-
-    if (repLog.correctForm) {
-      _voicePlayer.speak('common.correct');
-      return;
-    }
-
-    final faultIds = _faultIdsForRepLog(script, repLog);
-    if (faultIds.isEmpty) {
-      _voicePlayer.speak('common.fix_pose');
-      return;
-    }
-
-    final faultId = script.faultIds.firstWhere(
-      faultIds.contains,
-      orElse: () => faultIds.first,
-    );
-    _speakFaultId(script, faultId);
-  }
-
-  void _speakFaultId(GenericExerciseVoiceScript script, String faultId) {
-    _setFaultCounts[faultId] = (_setFaultCounts[faultId] ?? 0) + 1;
-    _voicePlayer.speak(script.faultKey(faultId));
-  }
-
-  void _speakPreviousSetAdviceIfNeeded(
-    ExerciseBase exercise,
-    GenericExerciseVoiceScript script,
-  ) {
-    if (_didSpeakPreviousSetAdvice) return;
-    if (!exercise.shouldReplayPreviousSetVoiceFaults) return;
-
-    final previous = _previousSetFaultsBySlug[script.slug];
-    if (previous == null || previous.isEmpty) return;
-
-    final sorted = previous.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-    _voicePlayer.speak(script.cueKey('set_next_setup'));
-    for (final entry in sorted.take(2)) {
-      _voicePlayer.speak(script.setNextFaultKey(entry.key));
-    }
-    _didSpeakPreviousSetAdvice = true;
-  }
-
-  Set<String> _faultIdsForRepLog(
-    GenericExerciseVoiceScript script,
-    RepLog repLog,
-  ) {
-    final ids = <String>{};
-
-    if (repLog.correctForm) return ids;
-
-    for (final faultType in _faultTypesFromLog(repLog)) {
-      ids.addAll(_faultIdsForText(script, faultType));
-    }
-
-    return ids;
-  }
-
-  RepLog? _latestRepLog(ExerciseBase exercise, int repCount) {
-    for (final log in exercise.logger.repLogs.reversed) {
-      if (log.repNumber != repCount) continue;
-      return log;
-    }
-    return null;
-  }
-
-  RepLog? _latestRepLogAnyNumber(ExerciseBase exercise) {
-    if (exercise.logger.repLogs.isEmpty) {
-      return null;
-    }
-    return exercise.logger.repLogs.last;
-  }
-
-  Iterable<String> _faultTypesFromLog(RepLog log) sync* {
-    final faultTypes = log.data['fault_types'];
-    if (faultTypes is Iterable) {
-      for (final faultType in faultTypes) {
-        final value = faultType.toString().trim();
-        if (value.isNotEmpty) yield value;
-      }
-    }
-  }
-
-  Iterable<String> _faultIdsForText(
-    GenericExerciseVoiceScript script,
-    String text,
-  ) sync* {
-    final normalizedKey = _normalizeFaultKey(text);
-    for (final candidate in _candidateFaultIdsForKey(normalizedKey)) {
-      if (script.hasFault(candidate)) yield candidate;
-    }
-
-    final normalizedText = _normalizeFaultText(text);
-    for (final candidate in _candidateFaultIds(normalizedText)) {
-      if (script.hasFault(candidate)) yield candidate;
-    }
-  }
-
-  String? _faultIdForFeedback(
-    GenericExerciseVoiceScript script,
-    Map<String, String> feedback,
-  ) {
-    if (feedback.isEmpty || script.faultIds.isEmpty) return null;
-
-    final entries =
-        feedback.entries.where((entry) => !_isNonFaultFeedbackKey(entry.key));
-
-    for (final entry in entries) {
-      final keyText = _normalizeFaultKey(entry.key);
-      for (final candidate in _candidateFaultIdsForKey(keyText)) {
-        if (script.hasFault(candidate)) return candidate;
-      }
-
-      final valueText = _normalizeFaultText(entry.value);
-      if (!_looksLikeFaultText(valueText)) continue;
-
-      final entryText = _normalizeFaultText('${entry.key} ${entry.value}');
-      for (final candidate in _candidateFaultIds(entryText)) {
-        if (script.hasFault(candidate)) return candidate;
-      }
-    }
-    return null;
-  }
-
-  bool _looksLikeFaultText(String text) {
-    const correctivePhrases = [
-      'giu got',
-      'giu lung',
-      'giu than',
-      'giu hong',
-      'giu goi',
-      'giu vai',
-      'giu tay',
-      'giu co tay',
-      'giu thang',
-      'giu dau',
-      'day ',
-      'mo ',
-      'doi ',
-      'trung ',
-      'tiep dat',
-      'ha ',
-      'xuong',
-      'nang',
-      'khong ',
-      'can ',
-      'thu ',
-    ];
-    const markers = [
-      'fault',
-      'error',
-      'warning',
-      'bad',
-      'fix',
-      'too ',
-      'don',
-      'not ',
-      'miss',
-      'low',
-      'high',
-      'lower',
-      'higher',
-      'raise',
-      'drop',
-      'slow',
-      'fast',
-      'lift',
-      'collapse',
-      'sag',
-      'pike',
-      'lean',
-      'bend',
-      'straighten',
-      'unstable',
-      'shallow',
-      'sai',
-      'chua',
-      'thieu',
-      'nong',
-      'thap',
-      'cao',
-      'qua',
-      'lech',
-      'vo',
-      'sup',
-      'gap',
-      'duoi',
-      'chong',
-      'cham',
-      'nhanh',
-    ];
-
-    return correctivePhrases.any(text.contains) || markers.any(text.contains);
-  }
-
-  Iterable<String> _candidateFaultIds(String text) sync* {
-    for (final candidate
-        in _candidateFaultIdsForKey(_normalizeFaultKey(text))) {
-      yield candidate;
-    }
-
-    if (text.contains('tempo') ||
-        text.contains('speed') ||
-        text.contains('fast') ||
-        text.contains('slow') ||
-        text.contains('cham') ||
-        text.contains('nhanh') ||
-        text.contains('toc do')) {
-      yield 'tempo';
-      yield 'speed';
-      yield 'tempo_fast';
-      yield 'tempo_slow';
-      yield 'too_fast';
-    }
-    if (text.contains('too deep') ||
-        text.contains('qua sau') ||
-        text.contains('sau qua')) {
-      yield 'too_deep';
-      yield 'depth_deep';
-    }
-    if (text.contains('depth') ||
-        text.contains('rom') ||
-        text.contains('low') ||
-        text.contains('shallow') ||
-        text.contains('nong') ||
-        text.contains('sau') ||
-        text.contains('thap') ||
-        text.contains('ha') ||
-        text.contains('xuong')) {
-      yield 'depth';
-      yield 'rom';
-      yield 'depth_shallow';
-      yield 'takeoff_depth';
-      yield 'landing_depth';
-      yield 'rear_depth';
-      yield 'squat_depth';
-      yield 'amplitude';
-    }
-    if (text.contains('takeoff') ||
-        text.contains('lay da') ||
-        text.contains('bat nhay')) {
-      yield 'takeoff_depth';
-    }
-    if (text.contains('landing') ||
-        text.contains('tiep dat') ||
-        text.contains('trung goi')) {
-      yield 'landing_depth';
-      if (text.contains('stiff') ||
-          text.contains('cung') ||
-          text.contains('thang')) {
-        yield 'landing_stiff';
-      }
-    }
-    if (text.contains('heel') || text.contains('got')) yield 'heel';
-    if (text.contains('knee') || text.contains('goi')) {
-      yield 'knee';
-      yield 'knee_valgus';
-      yield 'knee_angle';
-      yield 'knee_extension';
-      yield 'knee_hover';
-      yield 'front_knee';
-      yield 'back_knee';
-      yield 'knees';
-    }
-    if (text.contains('arm') ||
-        text.contains('wrist') ||
-        text.contains('tay') ||
-        text.contains('co tay')) {
-      yield 'arms';
-      yield 'arm_extension';
-      yield 'extension';
-      yield 'straight_arm';
-      yield 'hand';
-      yield 'wrist';
-    }
-    if (text.contains('elbow') || text.contains('khuyu')) {
-      yield 'elbow';
-      yield 'extension';
-      yield 'arm_extension';
-      yield 'setup_guard';
-    }
-    if (text.contains('leg') ||
-        text.contains('ankle') ||
-        text.contains('chan') ||
-        text.contains('co chan')) {
-      yield 'legs';
-      yield 'leg';
-      yield 'straight_leg';
-      yield 'stable_limbs';
-      yield 'elevation_leg';
-      yield 'ankle';
-      yield 'foot';
-    }
-    if (text.contains('hip') ||
-        text.contains('pelvic') ||
-        text.contains('hong') ||
-        text.contains('chau')) {
-      if (text.contains('high') ||
-          text.contains('pike') ||
-          text.contains('cao') ||
-          text.contains('nang')) {
-        yield 'pike';
-        yield 'piked';
-        yield 'hip_high';
-      }
-      if (text.contains('drop') ||
-          text.contains('low') ||
-          text.contains('thap') ||
-          text.contains('sup')) {
-        yield 'sag';
-        yield 'sagging';
-        yield 'trunk_sag';
-        yield 'pelvic_drop';
-      }
-      yield 'hip';
-      yield 'hip_extension';
-      yield 'hip_rotation';
-      yield 'hip_high';
-      yield 'hip_thrust';
-      yield 'pelvic';
-      yield 'pelvic_drop';
-    }
-    if (text.contains('back') ||
-        text.contains('trunk') ||
-        text.contains('spine') ||
-        text.contains('lumbar') ||
-        text.contains('lung') ||
-        text.contains('than') ||
-        text.contains('cot song') ||
-        text.contains('nguc')) {
-      if (text.contains('sag') ||
-          text.contains('drop') ||
-          text.contains('low') ||
-          text.contains('vo') ||
-          text.contains('sup')) {
-        yield 'sag';
-        yield 'sagging';
-        yield 'trunk_sag';
-        yield 'back_sag';
-      }
-      if (text.contains('pike') ||
-          text.contains('high') ||
-          text.contains('cao') ||
-          text.contains('nang')) {
-        yield 'pike';
-        yield 'piked';
-        yield 'trunk_pike';
-      }
-      yield 'trunk';
-      yield 'trunk_sag';
-      yield 'trunk_pike';
-      yield 'back_sag';
-      yield 'back_arch';
-      yield 'spine';
-      yield 'lumbar';
-      yield 'body_line';
-      yield 'torso';
-      yield 'chest';
-    }
-    if (text.contains('neck') ||
-        text.contains('head') ||
-        text.contains('ear') ||
-        text.contains('dau')) {
-      yield 'neck';
-      yield 'head';
-      yield 'cervical';
-      yield 'neck_pull';
-    }
-    if (text.contains('shoulder') || text.contains('vai')) {
-      yield 'shoulder';
-      yield 'shrug';
-    }
-    if (text.contains('hand')) yield 'hand';
-    if (text.contains('alternate') || text.contains('doi ben')) {
-      yield 'alternate';
-      yield 'alternating';
-    }
-    if (text.contains('same') ||
-        text.contains('opposite') ||
-        text.contains('cheo') ||
-        text.contains('nguoc')) {
-      yield 'opposite_side';
-      yield 'cross_rom';
-    }
-    if (text.contains('still') ||
-        text.contains('stable') ||
-        text.contains('on dinh')) {
-      yield 'stability';
-      yield 'drift';
-    }
-    if (text.contains('setup') ||
-        text.contains('guard') ||
-        text.contains('tu the') ||
-        text.contains('chi gap')) {
-      yield 'setup';
-      yield 'setup_guard';
-      yield 'wall_guard';
-    }
-    if (text.contains('double')) yield 'double_knee';
-    if (text.contains('momentum') || text.contains('jerk')) {
-      yield 'momentum';
-      yield 'jerking';
-    }
-  }
-
-  Iterable<String> _candidateFaultIdsForKey(String key) sync* {
-    if (key.isEmpty) return;
-    yield key;
-
-    switch (key) {
-      case 'heel_lift':
-        yield 'heel';
-        break;
-      case 'feet':
-        yield 'heel';
-        yield 'foot';
-        break;
-      case 'bent_straight_leg':
-        yield 'straight_leg';
-        break;
-      case 'torso_lean':
-        yield 'torso';
-        yield 'trunk';
-        break;
-      case 'back':
-        yield 'trunk';
-        yield 'torso';
-        break;
-      case 'core':
-        yield 'lumbar';
-        yield 'trunk';
-        break;
-      case 'shallow_depth':
-      case 'shallow_lunge':
-        yield 'depth_shallow';
-        yield 'depth';
-        yield 'rear_depth';
-        break;
-      case 'too_deep':
-        yield 'depth_deep';
-        break;
-      case 'power':
-        yield 'takeoff_depth';
-        break;
-      case 'speed_control':
-        yield 'speed';
-        yield 'tempo';
-        break;
-      case 'neck_head':
-        yield 'neck';
-        yield 'head';
-        break;
-      case 'knee_angle':
-        yield 'knee_angle';
-        yield 'knee';
-        break;
-      case 'hyperextension':
-        yield 'lumbar';
-        yield 'hip_extension';
-        break;
-      case 'hip_extension':
-        yield 'hip_extension';
-        break;
-      case 'knee_over_toe':
-        yield 'front_knee';
-        yield 'knee';
-        break;
-      case 'inconsistent_step':
-        yield 'step_length';
-        break;
-      case 'not_enough_hold':
-        yield 'hold';
-        break;
-      case 'knee':
-        yield 'landing_stiff';
-        yield 'landing_depth';
-        yield 'knee';
-        break;
-      case 'error':
-        yield 'too_fast';
-        break;
-    }
-  }
-
-  bool _feedbackIndicatesFault(Map<String, String> feedback) {
-    final result = _normalizeFaultText(feedback['Result'] ?? '');
-    if (result.contains('sai') ||
-        result.contains('fix') ||
-        result.contains('no count') ||
-        result.contains('khong tinh') ||
-        result.contains('chua tinh')) {
-      return true;
-    }
-
-    return feedback.entries.any((entry) {
-      if (_isNonFaultFeedbackKey(entry.key)) return false;
-      return _looksLikeFaultText(_normalizeFaultText(entry.value));
-    });
-  }
-
-  bool _isNoCountFeedback(Map<String, String> feedback) {
-    final result = _normalizeFaultText(feedback['Result'] ?? '');
-    return result.contains('no count') ||
-        result.contains('khong tinh') ||
-        result.contains('chua tinh');
-  }
-
-  bool _isNonFaultFeedbackKey(String key) {
-    final normalized = key.toLowerCase();
-    return normalized == 'system' ||
-        normalized == 'result' ||
-        normalized == 'progress' ||
-        normalized == 'status' ||
-        normalized == 'phase';
-  }
-
-  String _normalizeFaultKey(String value) {
-    final normalized = _normalizeFaultText(value)
-        .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
-        .replaceAll(RegExp(r'_+'), '_')
-        .replaceAll(RegExp(r'^_|_$'), '');
-    return normalized;
-  }
-
-  String _normalizeFaultText(String value) {
-    var text = value.toLowerCase();
-    const replacements = {
-      'á': 'a',
-      'à': 'a',
-      'ả': 'a',
-      'ã': 'a',
-      'ạ': 'a',
-      'ă': 'a',
-      'ắ': 'a',
-      'ằ': 'a',
-      'ẳ': 'a',
-      'ẵ': 'a',
-      'ặ': 'a',
-      'â': 'a',
-      'ấ': 'a',
-      'ầ': 'a',
-      'ẩ': 'a',
-      'ẫ': 'a',
-      'ậ': 'a',
-      'é': 'e',
-      'è': 'e',
-      'ẻ': 'e',
-      'ẽ': 'e',
-      'ẹ': 'e',
-      'ê': 'e',
-      'ế': 'e',
-      'ề': 'e',
-      'ể': 'e',
-      'ễ': 'e',
-      'ệ': 'e',
-      'í': 'i',
-      'ì': 'i',
-      'ỉ': 'i',
-      'ĩ': 'i',
-      'ị': 'i',
-      'ó': 'o',
-      'ò': 'o',
-      'ỏ': 'o',
-      'õ': 'o',
-      'ọ': 'o',
-      'ô': 'o',
-      'ố': 'o',
-      'ồ': 'o',
-      'ổ': 'o',
-      'ỗ': 'o',
-      'ộ': 'o',
-      'ơ': 'o',
-      'ớ': 'o',
-      'ờ': 'o',
-      'ở': 'o',
-      'ỡ': 'o',
-      'ợ': 'o',
-      'ú': 'u',
-      'ù': 'u',
-      'ủ': 'u',
-      'ũ': 'u',
-      'ụ': 'u',
-      'ư': 'u',
-      'ứ': 'u',
-      'ừ': 'u',
-      'ử': 'u',
-      'ữ': 'u',
-      'ự': 'u',
-      'ý': 'y',
-      'ỳ': 'y',
-      'ỷ': 'y',
-      'ỹ': 'y',
-      'ỵ': 'y',
-      'đ': 'd',
-    };
-    for (final entry in replacements.entries) {
-      text = text.replaceAll(entry.key, entry.value);
-    }
-    return text;
-  }
-
-  @override
-  Future<void> waitUntilIdle({
-    Duration timeout = const Duration(seconds: 4),
-  }) {
-    return _voicePlayer.waitUntilIdle(timeout: timeout);
-  }
-
-  @override
-  void dispose() {
-    _resetHoldProgressTracking();
-    _setFaultCounts.clear();
-    _voicePlayer.clearQueue();
-    _voicePlayer.dispose();
-  }
 }

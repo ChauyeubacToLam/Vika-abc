@@ -340,7 +340,8 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
     _currentSetReport = null;
     _currentSetLogger = null;
     _prescribedRepsBySet[_currentSet - 1] = _currentRepsTarget;
-    _activeExercise = _spec.createExercise(_currentRepsTarget);
+    _activeExercise = _spec.createExercise(_currentRepsTarget)
+      ..isFinalSet = _currentSet >= _spec.sets;
     _phase = _WorkoutFlowPhase.active;
   }
 
@@ -847,8 +848,9 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
           exercise: _activeExercise!,
           currentSet: _currentSet,
           totalSets: _spec.sets,
-          totalReps: _currentRepsTarget,
+          totalReps: _spec.repHeroTarget ?? _currentRepsTarget,
           isTimeBased: _spec.timeBased,
+          showRepTracking: _spec.hybrid ? true : null,
           onSetComplete: _handleSetComplete,
           onBack: () => Navigator.of(context).pop(),
         ),
@@ -901,6 +903,8 @@ const int kFallbackSeconds = 30;
   String targetLabel,
   double secondsPerUnit,
   bool timeBased,
+  bool hybrid,
+  int? repHeroTarget,
   ExerciseBase exercise,
 }) debugBuildExerciseExperienceSpec(
   ExerciseDefinition definition, {
@@ -918,6 +922,8 @@ const int kFallbackSeconds = 30;
     targetLabel: spec.targetLabel,
     secondsPerUnit: spec.secondsPerUnit,
     timeBased: spec.timeBased,
+    hybrid: spec.hybrid,
+    repHeroTarget: spec.repHeroTarget,
     exercise: spec.createExercise(spec.repsPerSet),
   );
 }
@@ -936,6 +942,8 @@ class _ExerciseExperienceSpec {
     required this.callouts,
     required this.createExercise,
     this.timeBased = false,
+    this.hybrid = false,
+    this.repHeroTarget,
   });
 
   final int sets;
@@ -950,6 +958,8 @@ class _ExerciseExperienceSpec {
   final List<SkeletonCallout> callouts;
   final ExerciseBase Function(int repsPerSet) createExercise;
   final bool timeBased;
+  final bool hybrid;
+  final int? repHeroTarget;
 
   factory _ExerciseExperienceSpec.fromDefinition(
     ExerciseDefinition definition, {
@@ -1122,6 +1132,27 @@ class _ExerciseExperienceSpec {
           restSeconds: overrideRest,
           createExercise: (repsPerSet) => Plank(maxRep: repsPerSet),
         );
+      case 'high__plank':
+        final holdCount =
+            (volume.reps == null || volume.reps! < 1) ? 1 : volume.reps!;
+        final perHoldSeconds = (volume.seconds == null || volume.seconds! < 1)
+            ? target
+            : volume.seconds!;
+        return _generic(
+          definition: definition,
+          sets: sets,
+          repsPerSet: perHoldSeconds,
+          restSeconds: overrideRest,
+          targetLabel: 'GIÂY/HIỆP',
+          secondsPerUnit: 1,
+          timeBased: true,
+          hybrid: true,
+          repHeroTarget: holdCount,
+          createExercise: (_) => definition.createExercise(
+            reps: holdCount,
+            seconds: perHoldSeconds,
+          ),
+        );
       case 'jumping_jack':
         return _jumpingJackSpec(
           definition: definition,
@@ -1188,13 +1219,21 @@ class _ExerciseExperienceSpec {
   /// from the catalog entry; `target` is the per-set rep/second goal AND the
   /// scoring denominator, so it is hard-floored at 1 and asserted positive — it
   /// can never be 0.
-  static ({int sets, int target, bool isHold}) _resolveVolume(
+  static ({
+    int sets,
+    int target,
+    bool isHold,
+    int? reps,
+    int? seconds,
+  }) _resolveVolume(
     ExerciseDefinition definition,
     VolumePrescription? prescription,
     ExerciseLaunchCatalogInfo? catalogInfo,
   ) {
     final catalogSeconds = catalogInfo?.baseSeconds;
     final catalogReps = catalogInfo?.baseReps;
+    final resolvedReps = prescription?.reps ?? catalogReps;
+    final resolvedSeconds = prescription?.seconds ?? catalogSeconds;
     final rawSets =
         prescription?.sets ?? catalogInfo?.baseSets ?? kFallbackSets;
     // A plan may explicitly override the catalog modality. If neither source
@@ -1228,7 +1267,13 @@ class _ExerciseExperienceSpec {
       }
       return true;
     }());
-    return (sets: sets, target: target, isHold: isHold);
+    return (
+      sets: sets,
+      target: target,
+      isHold: isHold,
+      reps: resolvedReps,
+      seconds: resolvedSeconds,
+    );
   }
 
   static _ExerciseExperienceSpec _generic({
@@ -1239,6 +1284,8 @@ class _ExerciseExperienceSpec {
     String targetLabel = 'REP/HIỆP',
     double secondsPerUnit = 4,
     bool timeBased = false,
+    bool hybrid = false,
+    int? repHeroTarget,
     required ExerciseBase Function(int repsPerSet) createExercise,
   }) {
     return _ExerciseExperienceSpec(
@@ -1287,6 +1334,8 @@ class _ExerciseExperienceSpec {
       ],
       createExercise: createExercise,
       timeBased: timeBased,
+      hybrid: hybrid,
+      repHeroTarget: repHeroTarget,
     );
   }
 

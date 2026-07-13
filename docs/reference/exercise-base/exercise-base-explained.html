@@ -388,7 +388,6 @@ mark.note-hl.flash{animation:noteflash 1.2s ease}
 <span class="k">import</span> <span class="s">"../utils/exercise_logger.dart"</span>;
 <span class="k">import</span> <span class="s">'../debug/debug_types.dart'</span>;
 <span class="k">import</span> <span class="s">'../services/generic_exercise_voice_assets.dart'</span>;
-<span class="k">import</span> <span class="s">'../services/queued_asset_voice_player.dart'</span>;
 <span class="k">import</span> <span class="s">'../services/viettel_tts_service.dart'</span>;
 <span class="k">import</span> <span class="s">'../pose/presence_anomaly_detector.dart'</span>;
 <span class="k">import</span> <span class="s">'dart:math'</span> <span class="k">as</span> math;
@@ -1491,7 +1490,10 @@ mark.note-hl.flash{animation:noteflash 1.2s ease}
     <span class="k">await</span> _personDetector.close();
   }
 
-  ExerciseVoiceCoach? createVoiceCoach() =&gt; _GenericExerciseVoiceCoach();
+  ExerciseVoiceCoach? createVoiceCoach() {
+    <span class="c">// Builds PolicyVoiceCoach from the exercise asset footprint + modality.</span>
+    ...
+  }
 
   <span class="c">/// Whether the generic coach may replay faults from the previous set while
   /// preparing the next one.</span>
@@ -1504,8 +1506,8 @@ mark.note-hl.flash{animation:noteflash 1.2s ease}
     “is a human here?” AI on the raw camera image; the camera page calls it on its own schedule (not every
     frame). <code>disposeDetectors</code> is cleanup when you leave the screen — “turn the AI off so it
     doesn’t hog the camera.” <code>createVoiceCoach</code> is the factory: by default every exercise gets the
-    generic talking coach, but a specific exercise can override this to return its own (Squat returns
-    <code>SquatVoiceCoach()</code>).</p>
+    shared policy coach from its script footprint and modality. A specific exercise can still override this
+    factory where its behavior genuinely differs.</p>
   </div>
 </section>
 
@@ -2405,490 +2407,64 @@ mark.note-hl.flash{animation:noteflash 1.2s ease}
 
 <!-- ============ 15 VOICE ============ -->
 <section id="voice">
-  <p class="kicker"><span class="n">15</span> The talking trainer <span class="range">· L775–1661</span></p>
-  <h2>The voice-coach machinery — the elephant</h2>
-  <div class="call warn">
-    <p class="ct">⚠️ This is ~53% of the whole file</p>
-    <p>Lines 775–1661 are two private classes that have <strong>nothing structurally to do with the
-    exercise base</strong> — they’re the generic talking coach. Every other coach (Squat, Plank…) already
-    lives in <code>lib/services/*_voice_coach.dart</code>. This generic one is the odd one out sitting in the
-    base file. It’s the #1 refactor target: move it to <code>lib/services/generic_exercise_voice_coach.dart</code>.
-    Below I show its shape and the one method that matters, then honestly mark what I elided.</p>
-  </div>
-
-  <h3>15a · The asset player (a thin wrapper)</h3>
-  <div class="code">
-    <div class="code-head"><span>class _GenericAssetVoicePlayer</span><b>L775–793</b></div>
-    <div class="code-body">
-<pre class="gut">775
-776
-777
-778
-779
-780
-781
-782
-783
-784
-785
-786
-787
-788
-789
-790
-791
-792
-793</pre>
-<pre class="src"><span class="k">class</span> _GenericAssetVoicePlayer {
-  _GenericAssetVoicePlayer()
-      : _player = QueuedAssetVoicePlayer(
-          assetMap: GenericExerciseVoiceAssets.commonFiles,
-          assetSourcePrefix: GenericExerciseVoiceAssets.assetSourcePrefix,
-          assetBundlePrefix: GenericExerciseVoiceAssets.assetBundlePrefix,
-          assetResolver: GenericExerciseVoiceAssets.resolveAsset,
-          logTag: <span class="s">'GenericExerciseVoice'</span>,
-        );
-
-  <span class="k">final</span> QueuedAssetVoicePlayer _player;
-
-  Future&lt;<span class="k">void</span>&gt; speak(String text) =&gt; _player.speak(text);
-  Future&lt;<span class="k">void</span>&gt; waitUntilIdle({<span class="k">required</span> Duration timeout}) =&gt;
-      _player.waitUntilIdle(timeout: timeout);
-  <span class="k">void</span> clearQueue() =&gt; _player.clearQueue();
-  <span class="k">void</span> clearPendingButKeepCurrent() =&gt; _player.clearPendingButKeepCurrent();
-  <span class="k">void</span> dispose() =&gt; _player.dispose();
-}</pre>
-    </div>
-  </div>
-  <div class="call eli">
-    <p class="ct">🧒 Like you’re five</p>
-    <p>A little remote control for pre-recorded Vietnamese audio clips. <code>speak('common.ready')</code>
-    plays the “Sẵn sàng” clip. It queues clips so they don’t talk over each other, and
-    <code>clearPendingButKeepCurrent</code> means “let the current word finish but drop the backlog” (used
-    when a rep suddenly completes and older cues are now stale).</p>
-  </div>
-
-  <h3>15b · The coach’s memory, and <code>processFrame</code> — the one method that matters</h3>
-  <p>The coach keeps a pile of “have I said this yet?” flags and cooldown timers so it doesn’t nag. Then
-  <code>processFrame</code> decides, every frame, what (if anything) to say.</p>
-  <div class="code">
-    <div class="code-head"><span>_GenericExerciseVoiceCoach — fields</span><b>L795–814</b></div>
-    <div class="code-body">
-<pre class="gut">795
-796
-797
-798
-799
-800
-801
-802
-803
-804
-805
-806
-807
-808
-809
-810
-811
-812
-813
-814</pre>
-<pre class="src"><span class="k">class</span> _GenericExerciseVoiceCoach <span class="k">implements</span> ExerciseVoiceCoach {
-  <span class="k">static final</span> Map&lt;String, Map&lt;String, <span class="k">int</span>&gt;&gt; _previousSetFaultsBySlug = {};
-  <span class="k">static const int</span> _noCountCueCooldownMs = 1200;
-  <span class="k">static const int</span> _holdFaultCueCooldownMs = 2500;
-  <span class="k">static const int</span> _holdStallFramesBeforeCue = 4;
-  <span class="k">static const double</span> _holdProgressEpsilonSeconds = 0.05;
-
-  <span class="k">final</span> _GenericAssetVoicePlayer _voicePlayer = _GenericAssetVoicePlayer();
-  <span class="k">final</span> Map&lt;String, <span class="k">int</span>&gt; _setFaultCounts = {};
-
-  <span class="k">int</span> _lastRepCount = 0;
-  <span class="k">int</span> _lastNoCountCueAtMs = 0;
-  <span class="k">int</span> _lastHoldFaultCueAtMs = 0;
-  <span class="k">int</span> _holdStallFrames = 0;
-  <span class="k">int</span>? _lastOutcomeRepNumber;
-  <span class="k">double</span>? _lastLiveHoldSeconds;
-  <span class="k">bool</span> _didAnnounceReady = false;
-  <span class="k">bool</span> _didSpeakSetup = false;
-  <span class="k">bool</span> _didSpeakPreviousSetAdvice = false;
-  <span class="k">bool</span> _didAnnounceSetComplete = false;
-}</pre>
-    </div>
-    <div class="elide">… class body continues (processFrame + helpers) — shown next, closing brace is really at L1661 …</div>
-  </div>
-  <div class="call eli">
-    <p class="ct">🧒 Like you’re five</p>
-    <p>Notice <code>_previousSetFaultsBySlug</code> is <code>static</code> — it survives between exercises, so
-    the coach can say at the start of set 2: “last time your hips sagged, watch that.” The rest are “did I
-    already say hello?” flags and “don’t repeat within X ms” cooldowns so the trainer isn’t annoying.</p>
-  </div>
-
-  <div class="code">
-    <div class="code-head"><span>processFrame — the decision tree</span><b>L816–947</b></div>
-    <div class="code-body">
-<pre class="gut">816
-817
-818
-819
-820
-821
-822
-823
-824
-825
-826
-827
-828
-829
-830
-831
-832
-833
-834
-835
-836
-837
-838
-839
-840
-841
-842
-843
-844
-845
-846
-847
-848
-849
-850
-851
-852
-853
-854
-855
-856
-857
-858
-859
-860
-861
-862
-863
-864
-865
-866
-867
-868
-869
-870
-871
-872
-873
-874
-875
-876
-877
-878
-879
-880
-881
-882
-883
-884
-885
-886
-887
-888
-889
-890
-891
-892
-893
-894
-895
-896
-897
-898
-899
-900
-901
-902
-903
-904
-905
-906
-907
-908
-909
-910
-911
-912
-913
-914
-915
-916
-917
-918
-919
-920
-921
-922
-923
-924
-925
-926
-927
-928
-929
-930
-931
-932
-933
-934
-935
-936
-937
-938
-939
-940
-941
-942
-943
-944
-945
-946
-947</pre>
-<pre class="src">  @override
-  <span class="k">void</span> processFrame({
-    <span class="k">required</span> ExerciseBase exercise,
-    <span class="k">required int</span> repCount,
-    <span class="k">required bool</span> hasPose,
-    <span class="k">required</span> Map&lt;String, String&gt; feedback,
-  }) {
-    <span class="k">final</span> script =
-        GenericExerciseVoiceAssets.scriptForExerciseName(exercise.exerciseName);
-    <span class="k">final</span> repIncreased = repCount &gt; _lastRepCount;
-    <span class="k">final</span> isHoldTimerExercise = exercise.liveHoldTargetSeconds != null;
-
-    <span class="k">if</span> (exercise.exerciseState == ExerciseState.completed) {
-      <span class="k">if</span> (!_didAnnounceSetComplete) {
-        _voicePlayer.clearPendingButKeepCurrent();
-        <span class="k">if</span> (repIncreased) {
-          <span class="k">final</span> completedRepLog = _latestRepLog(exercise, repCount);
-          <span class="k">final</span> latestRepLog = _latestRepLogAnyNumber(exercise);
-          <span class="k">if</span> (completedRepLog != null &amp;&amp;
-              completedRepLog.repNumber != _lastOutcomeRepNumber) {
-            _speakRepLogOutcome(
-              script: script,
-              repLog: completedRepLog,
-              includeCount: true,
-            );
-          } <span class="k">else if</span> (isHoldTimerExercise &amp;&amp;
-              latestRepLog != null &amp;&amp;
-              latestRepLog.repNumber != _lastOutcomeRepNumber) {
-            _speakRepLogOutcome(
-              script: script,
-              repLog: latestRepLog,
-              includeCount: false,
-            );
-          } <span class="k">else if</span> (completedRepLog == null &amp;&amp; latestRepLog == null) {
-            _speakUnknownRepOutcome(
-              script: script,
-              repCount: repCount,
-              feedback: feedback,
-            );
-          }
-        } <span class="k">else if</span> (isHoldTimerExercise) {
-          <span class="k">final</span> latestRepLog = _latestRepLogAnyNumber(exercise);
-          <span class="k">if</span> (latestRepLog != null &amp;&amp;
-              latestRepLog.repNumber != _lastOutcomeRepNumber) {
-            _speakRepLogOutcome(
-              script: script,
-              repLog: latestRepLog,
-              includeCount: false,
-            );
-          }
-        }
-        _voicePlayer.speak(<span class="s">'common.exercise_complete'</span>);
-        _previousSetFaultsBySlug[script.slug] = Map.of(_setFaultCounts);
-        _didAnnounceSetComplete = true;
-      }
-      _lastRepCount = repCount;
-      <span class="k">return</span>;
-    }
-
-    <span class="k">if</span> (exercise.exerciseState == ExerciseState.notActivated) {
-      _speakSetup(exercise, script);
-      _lastRepCount = repCount;
-      <span class="k">return</span>;
-    }
-
-    <span class="k">if</span> (exercise.exerciseState != ExerciseState.activated ||
-        exercise.isPaused ||
-        !hasPose) {
-      _lastRepCount = repCount;
-      _resetHoldProgressTracking();
-      <span class="k">return</span>;
-    }
-
-    <span class="k">if</span> (!_didAnnounceReady) {
-      _voicePlayer.speak(<span class="s">'common.ready'</span>);
-      _didAnnounceReady = true;
-      _speakPreviousSetAdviceIfNeeded(exercise, script);
-    }
-
-    <span class="k">if</span> (isHoldTimerExercise) {
-      _handleHoldTimerProgress(
-        script: script,
-        exercise: exercise,
-        feedback: feedback,
-      );
-
-      <span class="k">if</span> (repIncreased &amp;&amp; _latestRepLog(exercise, repCount) == null) {
-        _lastRepCount = repCount;
-        <span class="k">return</span>;
-      }
-    }
-
-    <span class="k">if</span> (!repIncreased &amp;&amp; _isNoCountFeedback(feedback)) {
-      <span class="k">final</span> nowMs = DateTime.now().millisecondsSinceEpoch;
-      <span class="k">if</span> (nowMs - _lastNoCountCueAtMs &gt;= _noCountCueCooldownMs) {
-        _voicePlayer.clearPendingButKeepCurrent();
-        _voicePlayer.speak(<span class="s">'common.no_count'</span>);
-        <span class="k">final</span> faultId = _faultIdForFeedback(script, feedback);
-        <span class="k">if</span> (faultId != null) {
-          _setFaultCounts[faultId] = (_setFaultCounts[faultId] ?? 0) + 1;
-          _voicePlayer.speak(script.faultKey(faultId));
-        } <span class="k">else if</span> (_feedbackIndicatesFault(feedback)) {
-          _voicePlayer.speak(<span class="s">'common.fix_pose'</span>);
-        }
-        _lastNoCountCueAtMs = nowMs;
-      }
-      _lastRepCount = repCount;
-      <span class="k">return</span>;
-    }
-
-    <span class="k">if</span> (repIncreased) {
-      <span class="k">final</span> completedRepLog = _latestRepLog(exercise, repCount);
-      _voicePlayer.clearPendingButKeepCurrent();
-      <span class="k">if</span> (completedRepLog != null) {
-        _speakRepLogOutcome(
-          script: script,
-          repLog: completedRepLog,
-          includeCount: true,
-        );
-      } <span class="k">else</span> {
-        _speakUnknownRepOutcome(
-          script: script,
-          repCount: repCount,
-          feedback: feedback,
-        );
-      }
-      _lastRepCount = repCount;
-      <span class="k">return</span>;
-    }
-
-    _lastRepCount = repCount;
-  }</pre>
-    </div>
-  </div>
-  <div class="call eli">
-    <p class="ct">🧒 Like you’re five</p>
-    <p>Read it as a top-to-bottom “what should I say right now?” checklist: <strong>Set done?</strong> say
-    the last rep’s outcome + “Hoàn thành bài tập,” and stash this set’s faults for next time.
-    <strong>Still setting up?</strong> say the setup instructions. <strong>Paused / no body?</strong> say
-    nothing. <strong>First live frame?</strong> say “Sẵn sàng” + replay last set’s advice.
-    <strong>A rep just completed?</strong> say the number and whether it was good or which fault it had.
-    <strong>A rep was rejected (“no count”)?</strong> say why, but no more than once every 1.2s. Each branch
-    ends with <code>return</code> so only one thing is said per frame.</p>
-  </div>
-
-  <h3>15c · What I elided, and why</h3>
-  <div class="call warn">
-    <p class="ct">⚠️ Honest disclosure of the ~430 lines not shown verbatim</p>
-    <p>Lines 949–1645 are helper methods that turn messy feedback text into an audio-clip id. I’m
-    summarizing rather than pasting all of it because it’s highly repetitive keyword-matching — but here’s
-    exactly what’s there so nothing is hidden:</p>
-    <ul>
-      <li><code>_handleHoldTimerProgress</code> (L949–999) — for holds, notices when your hold seconds
-      <em class="term">stall</em> and nudges you after 4 stalled frames.</li>
-      <li><code>_speakSetup / _speakUnknownRepOutcome / _speakRepLogOutcome / _speakFaultId /
-      _speakPreviousSetAdviceIfNeeded</code> (L1006–1087) — the actual “say this clip” routines.</li>
-      <li><code>_faultIdsForRepLog / _latestRepLog / _latestRepLogAnyNumber / _faultTypesFromLog /
-      _faultIdsForText / _faultIdForFeedback</code> (L1089–1168) — dig the fault out of the logged rep.</li>
-      <li><code>_looksLikeFaultText</code> (L1170–1239) — two big keyword lists (English + un-accented
-      Vietnamese) that guess “does this text describe a fault?”</li>
-      <li><code>_candidateFaultIds</code> (L1241–1449) — a ~200-line waterfall of
-      <code>if (text.contains('knee')) yield 'knee'…</code> mapping words to fault ids.</li>
-      <li><code>_candidateFaultIdsForKey</code> (L1451–1528) — a <code>switch</code> of known aliases
-      (<code>heel_lift → heel</code>, etc.).</li>
-      <li><code>_feedbackIndicatesFault / _isNoCountFeedback / _isNonFaultFeedbackKey / _normalizeFaultKey</code>
-      (L1530–1568) — small text tests.</li>
-      <li><code>_normalizeFaultText</code> (L1570–1645) — a ~70-entry table stripping Vietnamese accents
-      (<code>ắ→a</code>) so matching is accent-insensitive.</li>
-      <li><code>waitUntilIdle / dispose</code> (L1647–1660) — finish the contract.</li>
-    </ul>
-  </div>
-  <p>A representative slice, so you can see the texture of the elided part:</p>
-  <div class="code">
-    <div class="code-head"><span>_candidateFaultIds — excerpt (representative)</span><b>L1299–1320</b></div>
-    <div class="code-body">
-<pre class="gut">1299
-1300
-1301
-1302
-1303
-1304
-1305
-1306
-1307
-1308
-1309
-1310
-1311
-1312
-1313
-1314
-1315
-1316
-1317
-1318
-1319
-1320</pre>
-<pre class="src">    <span class="k">if</span> (text.contains(<span class="s">'heel'</span>) || text.contains(<span class="s">'got'</span>)) <span class="k">yield</span> <span class="s">'heel'</span>;
-    <span class="k">if</span> (text.contains(<span class="s">'knee'</span>) || text.contains(<span class="s">'goi'</span>)) {
-      <span class="k">yield</span> <span class="s">'knee'</span>;
-      <span class="k">yield</span> <span class="s">'knee_valgus'</span>;
-      <span class="k">yield</span> <span class="s">'knee_angle'</span>;
-      <span class="k">yield</span> <span class="s">'knee_extension'</span>;
-      <span class="k">yield</span> <span class="s">'knee_hover'</span>;
-      <span class="k">yield</span> <span class="s">'front_knee'</span>;
-      <span class="k">yield</span> <span class="s">'back_knee'</span>;
-      <span class="k">yield</span> <span class="s">'knees'</span>;
-    }
-    <span class="k">if</span> (text.contains(<span class="s">'arm'</span>) ||
-        text.contains(<span class="s">'wrist'</span>) ||
-        text.contains(<span class="s">'tay'</span>) ||
-        text.contains(<span class="s">'co tay'</span>)) {
-      <span class="k">yield</span> <span class="s">'arms'</span>;
-      <span class="k">yield</span> <span class="s">'arm_extension'</span>;
-      <span class="k">yield</span> <span class="s">'extension'</span>;
-      <span class="k">yield</span> <span class="s">'straight_arm'</span>;
-      <span class="k">yield</span> <span class="s">'hand'</span>;
-      <span class="k">yield</span> <span class="s">'wrist'</span>;
-    }</pre>
-    </div>
-  </div>
+  <p class="kicker"><span class="n">15</span> Voice factory <span class="range">· current code</span></p>
+  <h2>The base builds the shared policy coach; no private legacy coach remains</h2>
   <div class="call tip">
-    <p class="ct">💡 The deeper suggestion</p>
-    <p>This whole text→fault-id guessing engine is <em class="term">brittle</em>: it re-derives structured
-    facts (which fault) from human-readable strings that were themselves generated from structured facts a
-    moment earlier. Every new fault means editing giant keyword lists in two languages. A sturdier design:
-    have each metric emit a <strong>stable fault id</strong> directly into the rep log, and let the coach look
-    up the clip by id — no string sniffing. That deletes ~400 of these lines. Bigger than a move, so it’s a
-    “when we touch voice next” item, not today.</p>
+    <p class="ct">✅ Pre-scale cleanup landed 07-12</p>
+    <p>The unused <code>_GenericAssetVoicePlayer</code> and <code>_GenericExerciseVoiceCoach</code> block was
+    deleted. It had no live constructor references after <code>createVoiceCoach</code> migrated to the shared
+    policy stack. The base now contains only the factory seam; queueing, cue policy, and playback stay in their
+    owning voice files.</p>
+  </div>
+
+  <div class="code">
+    <div class="code-head"><span>ExerciseBase.createVoiceCoach — current routing shape</span><b>verified 07-12</b></div>
+    <div class="code-body"><pre class="src">final legacy = GenericExerciseVoiceAssets.scriptForExerciseName(exerciseName);
+final isRepCountedHold = usesRepCountedHolds;
+final bundle = isRepCountedHold
+    ? VoiceDefaults.repCountedHold
+    : liveHoldTargetSeconds != null
+        ? VoiceDefaults.timeBased
+        : VoiceDefaults.repBased;
+
+final script = VoiceScript.from(
+  bundle,
+  slug: legacy.slug,
+  faultIds: legacy.faultIds,
+  reminderPools: isRepCountedHold
+      ? {
+          for (final id in legacy.faultIds)
+            id: ['${legacy.slug}.${id}_reminder'],
+        }
+      : const {},
+  hustleFinalPool:
+      isRepCountedHold ? VoiceLib.hustleRepCountedHoldFinal : const [],
+  repStartPhaseKeys: isRepCountedHold
+      ? const {REP_COUNTED_HOLD_PHASE_HOLDING}
+      : const {},
+);
+
+return PolicyVoiceCoach(
+  script: script,
+  coach: VoiceCoach(sink: AssetVoiceSink()),
+  targetReps: targetReps,
+  countsByRepNumber: liveHoldTargetSeconds == null || isRepCountedHold,
+);</pre></div>
+  </div>
+
+  <div class="call eli">
+    <p class="ct">🧒 Like you’re five</p>
+    <p>The base no longer owns a second talking brain. It looks up the exercise’s audio footprint, chooses one
+    of three shared scripts (rep, timer, or rep-counted hold), and hands everything to
+    <code>PolicyVoiceCoach</code>. High Plank’s temporary hold phase keys share constants with the producer and
+    consumer, so a rename fails loud instead of silently losing voice.</p>
+  </div>
+
+  <div class="call idea">
+    <p class="ct">🧠 Boundary that remains</p>
+    <p><code>GenericExerciseVoiceAssets</code> still maps exercise slugs and stable fault ids to asset keys.
+    That is data routing, not a private coach implementation. Exercise-specific coaches can still override
+    <code>createVoiceCoach</code> where their behavior genuinely differs.</p>
   </div>
 </section>
 
@@ -2900,11 +2476,11 @@ mark.note-hl.flash{animation:noteflash 1.2s ease}
   <table class="recap">
     <thead><tr><th>#</th><th>Where</th><th>What</th><th>Severity</th></tr></thead>
     <tbody>
-      <tr><td>1</td><td><code>L775–1661</code></td><td>Move the ~890-line generic voice coach out to <code>services/generic_exercise_voice_coach.dart</code>. It’s 53% of the file and unrelated to the base. Keep the <code>ExerciseVoiceCoach</code> interface importable.</td><td class="sev med">structure</td></tr>
+      <tr><td>1</td><td><code>voice factory tail</code></td><td><strong>LANDED 07-12:</strong> dead private generic coach/player removed. <code>createVoiceCoach</code> now routes directly to the shared policy stack.</td><td class="sev lo">done</td></tr>
       <tr><td>2</td><td><code>L420–469 + flags</code></td><td>Extract presence/pause/segmentation-trigger into a <code>PresenceGate</code> collaborator. ~200 lines, one responsibility. <strong>Ask-first</strong> — touches the frame pipeline.</td><td class="sev med">architecture</td></tr>
       <tr><td>3</td><td><code>L552</code></td><td><code>calScaleFactor</code> returns <code>1.0</code> on any missing dot → measurements can jump for a frame. Reuse last good scale instead.</td><td class="sev hi">correctness</td></tr>
       <tr><td>4</td><td><code>L655</code></td><td>Dead <code>if (_holdStillStartedAt != null) {}</code> with an empty body. Delete the line.</td><td class="sev lo">dead code</td></tr>
-      <tr><td>5</td><td><code>L1170–1449</code></td><td>Replace the string-sniffing fault engine with stable fault ids emitted by metrics. Deletes ~400 lines; kills a whole class of “new fault → edit keyword lists” bugs.</td><td class="sev med">design</td></tr>
+      <tr><td>5</td><td><code>voice scripts</code></td><td><strong>LANDED:</strong> policy voice consumes stable fault ids supplied by exercise scripts; the deleted legacy text-sniffing engine no longer lives in the base.</td><td class="sev lo">done</td></tr>
       <tr><td>6</td><td><code>L710–773</code></td><td>Lift <code>HoldSecondsAccumulator</code> to its own file — zero base coupling, 11 users.</td><td class="sev lo">structure</td></tr>
       <tr><td>7</td><td><code>L248–255</code></td><td>Answer the <code>// NOTE: redundant? / why?</code> comments in one real sentence (it’s an FPS EMA; <code>now</code> is intentionally reused) and delete the doubt.</td><td class="sev lo">clarity</td></tr>
       <tr><td>8</td><td><code>L18–19, 336, 338, 380</code></td><td>Whitespace/quote nits — run <code>dart format</code>; standardize on single-quote imports.</td><td class="sev lo">style</td></tr>
@@ -2913,9 +2489,9 @@ mark.note-hl.flash{animation:noteflash 1.2s ease}
   </table>
   <div class="call idea">
     <p class="ct">🧠 If you do them in order</p>
-    <p>#4, #6, #7, #8, #9 are safe, do-anytime cleanups. #1 is the big win (pure move, no behavior change).
-    #3 is the only genuine <em class="term">bug-ish</em> one. #2 and #5 are the real architecture — worth a
-    short design note and your sign-off before touching, since both live near the pipeline.</p>
+    <p>#1 and #5 are done through the shared policy migration and dead-code deletion. #4, #6, #7, #8, #9
+    remain safe cleanup candidates. #3 is still the genuine <em class="term">bug-ish</em> one. #2 remains
+    real pipeline architecture and still needs a design note plus sign-off before touching.</p>
   </div>
 </section>
 

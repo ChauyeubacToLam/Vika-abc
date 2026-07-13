@@ -16,7 +16,7 @@
     "classKey": "bear_plank",
     "isFormChecked": true,
     "sets": 1,
-    "reps": null,
+    "reps": 3,
     "seconds": 15,
     "vietnameseName": "Plank gấu",
     "englishName": "Bear Plank"
@@ -115,7 +115,7 @@
     "classKey": "high_plank",
     "isFormChecked": true,
     "sets": 1,
-    "reps": null,
+    "reps": 3,
     "seconds": 20,
     "vietnameseName": "Plank cao",
     "englishName": "High Plank"

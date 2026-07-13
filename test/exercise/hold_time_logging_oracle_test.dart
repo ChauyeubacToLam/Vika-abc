@@ -166,7 +166,7 @@ void main() {
 
   group('hold time logging oracle', () {
     test('High Plank good_seconds excludes active elbow-fault frames', () {
-      final exercise = HighPlank(maxSeconds: 10)
+      final exercise = HighPlank(maxHolds: 1, holdSeconds: 10)
         ..cameraFacing = CameraFacing.right;
       final clean = _highPlankPose();
       final elbowFault = _highPlankPose(elbowX: 420);
@@ -174,26 +174,23 @@ void main() {
       expect(exercise.isInStartPosition(clean), isTrue);
       _activate(exercise);
 
-      // Four clean frames enter holding at 3000ms. The elapsed holding window is
-      // 3000->7000ms: 2s clean plus 2s with elbow angle in the fault band.
-      _pump(exercise, clean, 0);
-      _pump(exercise, clean, 1000);
-      _pump(exercise, clean, 2000);
-      _pump(exercise, clean, 3000);
-      _pump(exercise, clean, 4000);
-      _pump(exercise, elbowFault, 5000);
-      _pump(exercise, clean, 6000);
-      _pump(exercise, elbowFault, 7000);
+      // Four clean frames enter holding at 750ms. Keep every later delta inside
+      // the production frame-gap gate: 2s clean, then 2s with bent elbows.
+      for (var ms = 0; ms <= 2750; ms += 250) {
+        _pump(exercise, clean, ms);
+      }
+      for (var ms = 3000; ms <= 4750; ms += 250) {
+        _pump(exercise, elbowFault, ms);
+      }
 
       exercise.onSetComplete();
 
       expect(exercise.logger.setLogs['total_seconds'], 10.0);
       expect(exercise.logger.setLogs['total_perfect_time_ms'], 4000);
+      // This direct metric fixture does not advance ExerciseBase's real-time
+      // stopwatch, so the seconds accumulator remains at zero here.
       expect(exercise.logger.setLogs['good_seconds'], 0.0);
-      expect(
-        exercise.logger.setLogs['elbow_seconds'],
-        isA<num>(),
-      );
+      expect(exercise.logger.setLogs['elbow_seconds'], isA<num>());
       expect(exercise.logger.setLogs['sagging_seconds'], isA<num>());
       expect(exercise.logger.setLogs['piked_seconds'], isA<num>());
     });

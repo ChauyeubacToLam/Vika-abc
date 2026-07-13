@@ -9,6 +9,7 @@ import 'package:vika/exercise/10.Vup/v_up.dart';
 import 'package:vika/exercise/12.Dead Bug/dead_bug.dart';
 import 'package:vika/exercise/13.Plank Up-Down/plank_up_down.dart';
 import 'package:vika/exercise/2.Sit-Up/sit_up.dart';
+import 'package:vika/exercise/3.High Plank/high_plank.dart';
 import 'package:vika/exercise/4.Mountain Climber/mountain_climber.dart';
 import 'package:vika/exercise/5.Superman/superman.dart';
 import 'package:vika/exercise/7.Plank Shoulder Tap/plank_shoulder_tap.dart';
@@ -35,6 +36,7 @@ import 'package:vika/exercise/wall_push_up/wall_push_up.dart' hide FaultRecord;
 import 'package:vika/services/generic_exercise_voice_assets.dart';
 import 'package:vika/utils/exercise_logger.dart';
 import 'package:vika/voice/voice_coach.dart';
+import 'package:vika/voice/earcon_player.dart';
 import 'package:vika/voice/policy_voice_coach.dart';
 import 'package:vika/voice/voice_content.dart';
 import 'package:vika/voice/voice_policy.dart';
@@ -382,8 +384,8 @@ void main() {
   });
 
   test('ashtanga selects the effort phase for its active mode', () {
-    final transientCoach = AshtangaNamaskara(maxRep: 2).createVoiceCoach()
-        as PolicyVoiceCoach;
+    final transientCoach =
+        AshtangaNamaskara(maxRep: 2).createVoiceCoach() as PolicyVoiceCoach;
     final microHoldCoach = AshtangaNamaskara(
       maxRep: 2,
       mode: AshtangaMode.microHold,
@@ -452,6 +454,27 @@ void main() {
     expect(policyCoach.script.countPool, VoiceDefaults.timeBased.count);
     expect(policyCoach.countsByRepNumber, isFalse);
     expect(policyCoach.script.faultKey('elbow'), 'cobra.elbow');
+  });
+
+  test('High Plank generic factory routes reps-of-holds voice metadata', () {
+    final exercise = HighPlank(maxHolds: 3, holdSeconds: 30);
+    final coach = exercise.createVoiceCoach();
+    addTearDown(() => coach?.dispose());
+
+    final policyCoach = coach! as PolicyVoiceCoach;
+    expect(policyCoach.script.countPool, VoiceDefaults.repCountedHold.count);
+    expect(policyCoach.countsByRepNumber, isTrue);
+    expect(policyCoach.targetReps, 3);
+    expect(policyCoach.script.repStartPhaseKeys, const {'holding'});
+    expect(policyCoach.script.effortPhaseKeys, isEmpty);
+    expect(
+      policyCoach.script.reminderPoolFor('sagging'),
+      const ['high_plank.sagging_reminder'],
+    );
+    expect(
+      kDefaultTuning[CueType.criticalFault]!.firstOccurrenceCertain,
+      isTrue,
+    );
   });
 
   test('squat uses fleet-standard silence with reminders and rep target', () {
@@ -2226,12 +2249,17 @@ void main() {
     );
   });
 
-  test('ready fires once on the activation edge; set-complete once on done',
-      () {
+  test('ready fires once; completion uses tone and final exercise line', () {
     final sink = _RecordingVoiceSink();
+    final earcon = _RecordingEarconSink();
     final exercise = _VoiceTestExercise(targetReps: 2)
-      ..exerciseState = ExerciseState.notActivated;
-    final coach = _setupCoach(sink: sink, targetReps: 2);
+      ..exerciseState = ExerciseState.notActivated
+      ..isFinalSet = true;
+    final coach = _setupCoach(
+      sink: sink,
+      targetReps: 2,
+      earcon: earcon,
+    );
     addTearDown(coach.dispose);
 
     _driveSetupFrame(coach, exercise, ms: 0, hasPose: false);
@@ -2246,7 +2274,10 @@ void main() {
     exercise.exerciseState = ExerciseState.completed;
     _driveSetupFrame(coach, exercise, ms: 300);
     _driveSetupFrame(coach, exercise, ms: 400);
-    expect(sink.keys.where((k) => k == 'common.set_complete'), hasLength(1));
+    expect(sink.keys.where((k) => k == 'common.set_complete'), isEmpty);
+    expect(
+        sink.keys.where((k) => k == 'common.exercise_complete'), hasLength(1));
+    expect(earcon.endToneCalls, 1);
   });
 
   test('holdStill emits no instruction line (and never common.hold_still)', () {
@@ -2656,6 +2687,7 @@ PolicyVoiceCoach _reminderCoach({
       random: _ScriptedRandom([0.0]),
     ),
     targetReps: targetReps,
+    earcon: _RecordingEarconSink(),
   );
 }
 
@@ -2703,6 +2735,7 @@ PolicyVoiceCoach _setupCoach({
   required VoiceSink sink,
   int? targetReps,
   VoiceScript? script,
+  EarconSink? earcon,
 }) {
   return PolicyVoiceCoach(
     script: script ??
@@ -2717,6 +2750,7 @@ PolicyVoiceCoach _setupCoach({
       random: _ScriptedRandom([0.0]),
     ),
     targetReps: targetReps,
+    earcon: earcon ?? _RecordingEarconSink(),
   );
 }
 
@@ -3126,7 +3160,11 @@ class _RecordingVoiceSink implements VoiceSink {
   bool get isBusy => false;
 
   @override
-  Future<void> playKey(String logicalKey) async {
+  Future<void> playKey(
+    String logicalKey, {
+    bool Function()? isStillRelevant,
+  }) async {
+    if (!(isStillRelevant?.call() ?? true)) return;
     keys.add(logicalKey);
   }
 
@@ -3147,6 +3185,21 @@ class _RecordingVoiceSink implements VoiceSink {
   void dispose() {}
 }
 
+class _RecordingEarconSink implements EarconSink {
+  int endToneCalls = 0;
+
+  @override
+  Future<void> endTone() async {
+    endToneCalls++;
+  }
+
+  @override
+  Future<void> restEndTone() async {}
+
+  @override
+  void dispose() {}
+}
+
 class _BusyRecordingVoiceSink implements VoiceSink {
   final List<String> keys = [];
   int clearPendingCalls = 0;
@@ -3158,7 +3211,11 @@ class _BusyRecordingVoiceSink implements VoiceSink {
   bool get isBusy => _busy;
 
   @override
-  Future<void> playKey(String logicalKey) async {
+  Future<void> playKey(
+    String logicalKey, {
+    bool Function()? isStillRelevant,
+  }) async {
+    if (!(isStillRelevant?.call() ?? true)) return;
     keys.add(logicalKey);
     _busy = true;
     _idleCompleter ??= Completer<void>();

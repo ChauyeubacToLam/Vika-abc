@@ -92,6 +92,16 @@ with a pixel floor for close framings.
 | ACTIVE body-line / shoulder-wrist-X / shoulder-above-wrist / knee-clearance | 150 / 0.70 / 0.05 / 0.05 | Looser than setup so fatigue is coached not rejected. ACTIVE shoulder-wrist-X flagged for cut. |
 | MAX_REP | 15 | Per-set cap |
 
+## High Plank Outer-Ring Thresholds (PROVISIONAL, July 12 2026)
+Device-tune starting band. The torso angle is measured from horizontal with
+`atan2(abs(shoulder.y - hip.y), abs(shoulder.x - hip.x))`; 0° is horizontal and 90° is vertical.
+
+| Parameter | Value | Notes |
+|---|---|---|
+| OUTER_ENTRY_TORSO_TILT_MAX | 40 deg | A pose must be at or below this tilt to (re)enter earned hold time. Unit geometry admits the tested ~37° deep-sag fixture; real-device sag/pike separation still needs retest. |
+| OUTER_EXIT_TORSO_TILT_MAX | 55 deg | A torso above this tilt drops the hold after the existing 2-frame exit debounce. 15° hysteresis prevents boundary flap. |
+| Valid hold-timer frame delta | 10-250ms inclusive | Shared by `TimerMetric` and `HoldSecondsAccumulator`. Smaller, negative, or larger gaps earn zero time; prevents pause/camera gaps from becoming hold credit. |
+
 ## Glute Bridge Form Thresholds
 | Parameter | Value | Notes |
 |---|---|---|

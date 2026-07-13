@@ -37,6 +37,12 @@ class GenericExerciseVoiceAssets {
     // tree 07-11; Nam can still listen-check wording/intonation.
     'common.push': 'common/push.mp3',
     'common.one_more_rep': 'common/one_more_rep.mp3',
+    // Hold-pilot within-hold keys (07-12): time milestones + hold hustle.
+    // Files TTS-generated 07-12 (missing-audio.md master list rows 167-170).
+    'common.time.halfway': 'common/time_halfway.mp3',
+    'common.time.10s_left': 'common/time_10s_left.mp3',
+    'common.hold_push': 'common/hold_push.mp3',
+    'common.hold_push_final': 'common/hold_push_final.mp3',
     '1': 'common/count_1.mp3',
     '2': 'common/count_2.mp3',
     '3': 'common/count_3.mp3',

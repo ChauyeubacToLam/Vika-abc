@@ -44,6 +44,7 @@ class ActiveExercisePage extends StatefulWidget {
     required this.totalSets,
     required this.totalReps,
     this.isTimeBased = false,
+    this.showRepTracking,
     required this.onSetComplete,
     required this.onBack,
   });
@@ -54,8 +55,11 @@ class ActiveExercisePage extends StatefulWidget {
   final int totalSets;
   final int totalReps;
   final bool isTimeBased;
+  final bool? showRepTracking;
   final ValueChanged<ExerciseLogger> onSetComplete;
   final VoidCallback onBack;
+
+  bool get showsRepTracking => showRepTracking ?? !isTimeBased;
 
   @override
   State<ActiveExercisePage> createState() => _ActiveExercisePageState();
@@ -1846,6 +1850,13 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     final overlayState = _overlayState;
     final bottomHoldCue = _displayedHoldCue;
     final holdRestRemaining = _holdRestRemaining;
+    final isReArming = widget.exercise.isReArmingHold;
+    final reArmProgress = widget.exercise.activationProgress;
+    // The 3s re-arm hold-still, fed into the new RestCountdownRing so the
+    // count reads in the hold-pilot ring design (not the legacy _CenterOverlay).
+    final reArmCountdownTotal =
+        ExerciseBase.HOLD_STILL_REQUIRED_DURATION.inMilliseconds / 1000.0;
+    final reArmCounting = isReArming && reArmProgress != null;
     final guidanceCopy = _currentGuidanceCopy;
     final activeState =
         widget.exercise.exerciseState == ExerciseState.activated &&
@@ -2133,7 +2144,8 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 260),
               child: overlayState == _LiveOverlayState.active ||
-                      guidanceCopy != null
+                      guidanceCopy != null ||
+                      isReArming
                   ? const SizedBox.shrink()
                   : Center(
                       child: _CenterOverlay(
@@ -2151,7 +2163,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
           // while ascending, hidden otherwise. Deliberately quiet. In
           // landscape the right edge belongs to the rep hero, so the stream
           // moves to the left. Shared so the tempo cue tracks on both pages.
-          if (!widget.isTimeBased &&
+          if (widget.showsRepTracking &&
               activeState &&
               guidanceCopy == null &&
               !showDebugPanel &&
@@ -2195,11 +2207,19 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
                     ),
                   );
                 },
-                child: holdRestRemaining != null
+                child: holdRestRemaining != null || isReArming
                     ? RestCountdownRing(
                         key: const ValueKey<String>('hold-rest-ring'),
-                        remainingSeconds: holdRestRemaining,
-                        totalSeconds: _restRingTotalSeconds,
+                        // Posed re-arm → the 3s activation counts DOWN in this
+                        // same ring (hold-pilot design). Not-posed re-arm is
+                        // handled by the reused setup banner, so this ring
+                        // only surfaces once counting.
+                        remainingSeconds: reArmCounting
+                            ? reArmCountdownTotal * (1 - reArmProgress)
+                            : holdRestRemaining ?? 0,
+                        totalSeconds: reArmCounting
+                            ? reArmCountdownTotal
+                            : _restRingTotalSeconds,
                       )
                     : HoldHeroRing(
                         key: const ValueKey<String>('hold-hero-ring'),
@@ -2253,7 +2273,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
           // under the hold cue and signage, so the hero owns the right edge
           // instead. No fault marking — feedback during the set is additive
           // only; the form verdict is computed after the set, never during.
-          if (!widget.isTimeBased &&
+          if (widget.showsRepTracking &&
               activeState &&
               guidanceCopy == null &&
               !showDebugPanel)
@@ -2460,6 +2480,10 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     }
 
     if (widget.exercise.exerciseState == ExerciseState.activated) {
+      if (widget.exercise.isReArmingHold &&
+          widget.exercise.activationProgress != null) {
+        return _LiveOverlayState.hold;
+      }
       if (_bottomHoldCue != null) {
         return _LiveOverlayState.hold;
       }
@@ -2576,12 +2600,18 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     return _lastKnownHoldSeconds;
   }
 
-  /// Remaining seconds of an in-set break in a hold exercise (e.g. plank's
-  /// 'Nghỉ 4.2s' status during PlankState.resting), or null while working.
-  /// Presentation-only read of the status vocabulary; also captures the rest
-  /// length for the ring's drain fraction.
+  /// Remaining seconds of an in-set break. Typed exercise values win; the
+  /// status-string parser remains as the Forearm Plank compatibility path.
   double? get _holdRestRemaining {
     if (!widget.isTimeBased) return null;
+    final typedRemaining = widget.exercise.liveRestSeconds;
+    if (typedRemaining != null) {
+      final target = widget.exercise.liveRestTargetSeconds;
+      _restRingTotalSeconds = target == null
+          ? typedRemaining.ceilToDouble()
+          : target.ceilToDouble();
+      return typedRemaining;
+    }
     final status = _currentPhaseStatus;
     final remaining = (status != null && status.contains('Nghỉ'))
         ? _extractDurationSeconds(status)

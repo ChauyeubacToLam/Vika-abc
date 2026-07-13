@@ -50,7 +50,11 @@ class _GateableVoiceSink implements VoiceSink {
   bool get isBusy => _busy;
 
   @override
-  Future<void> playKey(String logicalKey) async {
+  Future<void> playKey(
+    String logicalKey, {
+    bool Function()? isStillRelevant,
+  }) async {
+    if (!(isStillRelevant?.call() ?? true)) return;
     keys.add(logicalKey);
     _busy = true;
     _idleCompleter ??= Completer<void>();
@@ -141,6 +145,35 @@ VoicePolicy _gluteBridgePilotPolicy({
 
 void main() {
   group('praise', () {
+    test('forced milestone praise bypasses normal outcome guards and rolls',
+        () {
+      final policy = VoicePolicy(
+        random: _ScriptedRandom([0.99]),
+        tuning: {
+          ...kDefaultTuning,
+          CueType.praise:
+              const CueTuning(CueMode.variableRatio, base: 0, cap: 0),
+        },
+      );
+
+      expect(
+        policy.decide(
+          CueType.praise,
+          const CueContext(repNumber: 1, force: true),
+        ),
+        isTrue,
+      );
+      expect(
+        policy.decide(
+          CueType.praise,
+          const CueContext(repNumber: 2, force: true),
+        ),
+        isTrue,
+        reason: 'the hold adapter owns milestone alternation before forcing',
+      );
+      expect(policy.lastReason, 'praise-forced');
+    });
+
     test('never fires twice in a row, even with a favourable roll', () {
       // 0.0 is below every positive probability this policy will ever
       // compute, i.e. "always take it if the hard rules allow it".
@@ -513,6 +546,36 @@ void main() {
   });
 
   group('hustle', () {
+    test('forced milestone hustle bypasses busy and second-outcome guards', () {
+      final policy = VoicePolicy(
+        random: _ScriptedRandom([0.99]),
+        tuning: {
+          ...kDefaultTuning,
+          CueType.hustle: const CueTuning(CueMode.perishable, base: 0, cap: 0),
+        },
+      );
+
+      expect(
+        policy.decide(CueType.praise, const CueContext(repNumber: 1)),
+        isFalse,
+      );
+      expect(
+        policy.decide(
+          CueType.criticalFault,
+          const CueContext(repNumber: 1, contentKey: 'sagging'),
+        ),
+        isTrue,
+      );
+      expect(
+        policy.decide(
+          CueType.hustle,
+          const CueContext(repNumber: 1, sinkBusy: true, force: true),
+        ),
+        isTrue,
+      );
+      expect(policy.lastReason, 'hustle-forced');
+    });
+
     Map<CueType, CueTuning> hustleTuning({
       double base = 0.20,
       double step = 0.30,

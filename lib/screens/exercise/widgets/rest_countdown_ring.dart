@@ -24,6 +24,7 @@ class RestCountdownRing extends StatefulWidget {
     super.key,
     required this.remainingSeconds,
     required this.totalSeconds,
+    this.centerLabel,
     this.diameter = 210,
   });
 
@@ -32,6 +33,9 @@ class RestCountdownRing extends StatefulWidget {
 
   /// Full rest length — drives the drain fraction.
   final double totalSeconds;
+
+  /// Optional drained-state instruction in place of the countdown numeral.
+  final String? centerLabel;
 
   final double diameter;
 
@@ -128,14 +132,17 @@ class _RestCountdownRingState extends State<RestCountdownRing>
                     dimension: widget.diameter,
                     child: Center(
                       child: Text(
-                        '$second',
+                        widget.centerLabel ?? '$second',
+                        textAlign: TextAlign.center,
                         style: TextStyle(
                           fontFamily: VikaIvory.fontFamily,
-                          fontSize: 88,
+                          fontSize: widget.centerLabel == null ? 88 : 26,
                           fontWeight: FontWeight.w800,
-                          fontStyle: FontStyle.italic,
+                          fontStyle: widget.centerLabel == null
+                              ? FontStyle.italic
+                              : FontStyle.normal,
                           color: _amber,
-                          letterSpacing: -3,
+                          letterSpacing: widget.centerLabel == null ? -3 : -0.5,
                           height: 1,
                           shadows: [
                             Shadow(

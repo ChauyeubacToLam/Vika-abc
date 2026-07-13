@@ -1,4 +1,5 @@
 import 'high_plank_metric_base.dart';
+import '../../../utils/hold_seconds_accumulator.dart';
 
 class TimerMetric extends HighPlankMetricBase {
   @override
@@ -30,9 +31,12 @@ class TimerMetric extends HighPlankMetricBase {
       if (_lastTickMs == null) {
         _lastTickMs = ctx.frameTimestampMs;
       } else {
-        int delta = ctx.frameTimestampMs - _lastTickMs!;
-        totalHoldingTimeMs += delta;
+        final delta = ctx.frameTimestampMs - _lastTickMs!;
         _lastTickMs = ctx.frameTimestampMs;
+        if (delta >= HoldSecondsAccumulator.minFrameDeltaMs &&
+            delta <= HoldSecondsAccumulator.maxFrameDeltaMs) {
+          totalHoldingTimeMs += delta;
+        }
       }
     }
     _debugData['holdTime'] = (totalHoldingTimeMs / 1000.0).toStringAsFixed(1);
@@ -53,4 +57,6 @@ class TimerMetric extends HighPlankMetricBase {
   void pause() {
     _lastTickMs = null;
   }
+
+  void resetForNextHold() => reset();
 }

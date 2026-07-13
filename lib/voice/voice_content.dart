@@ -69,6 +69,7 @@ class CueContext {
     this.faultPersistence = 0,
     this.contentKey = '',
     this.sinkBusy = false,
+    this.force = false,
   });
 
   /// 1-based rep (or hold-tick) number.
@@ -101,6 +102,11 @@ class CueContext {
   /// (`hustle`/`phase`) drop rather than queue up and arrive late.
   final bool sinkBusy;
 
+  /// True only for a structural cue slot that must be filled deterministically.
+  /// The hold-milestone adapter uses this for its praise-or-hustle follow-up;
+  /// ordinary rep paths leave it false and retain the normal policy guards.
+  final bool force;
+
   CueContext copyWith({
     int? repNumber,
     bool? isFinalReps,
@@ -109,6 +115,7 @@ class CueContext {
     int? faultPersistence,
     String? contentKey,
     bool? sinkBusy,
+    bool? force,
   }) {
     return CueContext(
       repNumber: repNumber ?? this.repNumber,
@@ -118,6 +125,7 @@ class CueContext {
       faultPersistence: faultPersistence ?? this.faultPersistence,
       contentKey: contentKey ?? this.contentKey,
       sinkBusy: sinkBusy ?? this.sinkBusy,
+      force: force ?? this.force,
     );
   }
 }
@@ -213,6 +221,14 @@ class VoiceLib {
     'common.keep_going',
   ];
 
+  static const List<String> hustleRepCountedHold = [
+    'common.hold_push',
+  ];
+
+  static const List<String> hustleRepCountedHoldFinal = [
+    'common.hold_push_final',
+  ];
+
   /// key -> variations, for `VoiceContent.key`'s auto-variation lookup.
   /// Neither `common.good` nor `common.great` are ever sent to the sink
   /// directly — `VoiceCoach` always expands a key with registered
@@ -236,6 +252,14 @@ class VoiceDefaults {
   static const ScriptBundle timeBased = ScriptBundle(
     count: VoiceLib.countTime,
     hustle: VoiceLib.hustleHold,
+    praise: VoiceLib.praise,
+  );
+
+  /// Reps-of-holds pilot. Kept separate from [timeBased] so legacy timer and
+  /// yoga holds do not start speaking rep numerals as a side effect.
+  static const ScriptBundle repCountedHold = ScriptBundle(
+    count: VoiceLib.countReps,
+    hustle: VoiceLib.hustleRepCountedHold,
     praise: VoiceLib.praise,
   );
 }

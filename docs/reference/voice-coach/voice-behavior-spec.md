@@ -28,7 +28,9 @@ ba"); reminder gains a consecutive-rep same-content ban (hard rule 12).
 07-12 Tier 3: hustle enabled on all 24 rep exercises with verified effort-phase keys and the strict
 generic/final pools; six fast/quirky exercises retain the standard policy with explicit follow-up TODOs.
 07-11 late: HOLD-BASED family behavior decided (§ Hold-based exercises below) — pose-gated clock,
-voice milestones + final earcons, milestone praise/hustle switch; High Plank pilot, unimplemented.
+voice milestones + spoken final countdown + end tone (07-12 round 2: pips dropped, countdown went
+verbal, end tone extends to rep-based), milestone praise/hustle switch; High Plank pilot,
+implemented and device-tuned in the working tree.
 07-12: holds re-ruled to the PLANK MODEL — a set = N holds counted as reps, each completed hold
 speaks its number (registration); supersedes "a set = one continuous hold" (§ Hold-based).
 Design + state machine: [setup-safety-voice-design.html](setup-safety-voice-design.html) (same folder).
@@ -219,7 +221,11 @@ landmarks this exercise measures; a literal full-body gate would block a side-vi
 ### Setup / structure (`setup`) — deterministic, once per set (behavior ruled late 2026-07-10)
 Setup intro, ready countdown, set complete: exactly once at their moment, always, PER SET. (Was
 `instruction`; renamed `setup` 07-09.) The adapter latches each moment so it fires exactly once (hard
-rule 2). Wiring: docs/scratch/setup-intro-voice-impl-spec.md, after the 3-delta setup-safety spec.
+rule 2). **Set-complete re-ruled 07-12 round 2: the spoken `common.set_complete` line is REPLACED by
+the non-verbal end tone** (same "time!" sound as hold-end), fired as the set's final rep lands,
+alongside that rep's numeral. Same moment, same once-per-set latch — only the content flips from
+voice to earcon. The exercise's LAST set additionally speaks `common.exercise_complete` on top of
+the tone (ruled 07-12 — the coach's goodbye; all other sets are tone-only). Wiring: docs/scratch/setup-intro-voice-impl-spec.md, after the 3-delta setup-safety spec.
 - **Intro = one-shot broadcast, NOT a monitored latch.** `<slug>.setup_position` + `<slug>.active_intro`
   fire back-to-back once at set start, unconditional — the intro doesn't wait for in-frame; it IS the
   thing that tells the user to get in frame (why `searching` has no voice). It never re-fires or
@@ -478,7 +484,7 @@ channels — reminders, setup/tracking-safety, soft — where a verbatim repeat 
 (probabilistic cues hide their repetition behind varying gaps; praise already rotates a pool). A
 nice-to-have noted for the future, on no current checklist. (Nam, 2026-07-10.)
 
-## Hold-based exercises (time-based family) — DECIDED 2026-07-11, re-ruled 07-12, unimplemented
+## Hold-based exercises (time-based family) — DECIDED 2026-07-11, re-ruled 07-12, High Plank pilot implemented
 Nam's rulings via the hold-design lavish review + chat (07-11), plank-model re-ruling 07-12; full
 design in [hold-exercise-voice-design.html](hold-exercise-voice-design.html) (v2), impl spec
 docs/scratch/hold-voice-impl-spec.md (Codex), decision records decisions.md 07-11 "Hold-based voice
@@ -494,28 +500,60 @@ behavior LOCKED" + 07-12 "Holds count holds as REPS". High Plank = pilot. The ho
   gates time accrual; inner ring (form metrics) coaches real-time while the clock RUNS. Only
   cheating stops earning. Fault-seconds accounting keeps the summary honest. Reverses the shipped
   High Plank perfect-timer.
+- **Pause/re-hold discards the current partial hold; in-exercise drop/re-entry does not.** A base
+  pause means the user stopped the attempt and must earn a fresh hold from zero after the normal
+  start-position re-hold. Completed hold reps/logs survive. A brief outer-ring break inside the
+  exercise remains pause-and-resume. The hold timer drops any frame delta outside the canonical
+  range in `canonical-numbers.md`, so pause/camera gaps cannot become earned time.
 - **Within each hold: voice milestones** (deterministic, personality-immune, earned-time
   crossings, relative to PER-HOLD seconds): halfway + "còn 10 giây" (the latter only when the
-  hold is long enough for it to be distinct). Voice speaks REMAINING; UI ring unchanged. NO
-  spoken per-second countdown.
-- **Hold-end = earcons, not voice:** 3 identical beeps on the last 3 earned seconds + a distinct
-  end tone at hold completion (the count line then registers the landed hold). No continuous tick
-  in v1. Earcons are a separate lightweight channel — never queued behind voice lines (sounds
-  carry state, voice carries meaning).
-- **Milestone outcome slot switches praise/hustle by measured state:** clean since last milestone
-  → praise roll; struggling or final stretch → hustle roll; neither wins → time line alone. Never
-  praise two consecutive milestones (hard rule 6's hold form).
+  hold is long enough for it to be distinct). Voice speaks REMAINING; UI ring unchanged and
+  counts down independently — the voice/UI mismatch is accepted (re-ruled 07-12 round 2): the
+  voice only marks milestones and the final countdown, never tracks every second.
+- **Hold-end (re-ruled 07-12 round 2) = SPOKEN countdown + end tone:** "năm, bốn, ba, hai, một"
+  on the last 5 earned seconds (reuses `count_5..count_1`), then one distinct end tone as earned
+  time hits the per-hold target (the count line then registers the landed hold). The final-3
+  earcon pips are DROPPED for v1; no continuous tick. The end tone stays a separate lightweight
+  channel — never queued behind voice lines — and EXTENDS to rep-based exercises (RULED 07-12
+  round 2): the same "time!" sound REPLACES the spoken set-complete line, fired as the set's
+  final rep lands. Hold sets inherit for free — the last hold's per-hold tone IS the set marker;
+  no spoken set-complete anywhere.
+- **Inter-hold rest (RULED 07-12, refined same day):** rest START silent (amber RestCountdownRing
+  is the signal). Rest-timer completion fires the rest-end tone (assets/audio/common/
+  rest_end_tone.mp3, timed edge, honest) — then the re-arm phase REUSES set-start's setup_position
+  behavior WHOLE (UI + its voice), superseding the earlier voice-silent ruling (device-tune #3,
+  07-12): the existing "get into position" UI + voice fire ONLY when the user isn't posed (quiet
+  when posed, exactly like set-start), then the SAME "ba, hai, một" activation countdown; the next
+  hold's clock starts when it lands. No predictive spoken rest countdown. The next-hold reminder
+  queues behind "một", landing in the new hold's first seconds. HYBRID modality: former
+  hold-based exercises render time rings AND the rep-tracking UI. Full record: decisions.md
+  "Inter-hold rest RULED" + its REFINED bullet.
+- **Milestone outcome slot is deterministic (device-tuned 07-12):** every milestone time line is
+  followed by exactly one outcome. Clean since the last milestone → praise, unless the previous
+  milestone was praise, then hustle; struggling or final stretch → hustle. The hold adapter passes
+  `CueContext.force` only for this follow-up, bypassing the ordinary roll, sink-busy drop, collision
+  gap, and second-outcome suppression so a second milestone in the same hold cannot land silent.
+  Rep-path praise/hustle odds and guards are unchanged. A rep-counted-hold script must provide both
+  pools; empty praise/hustle pools log once in release and assert in debug instead of failing silent.
+- **Temporary phase-key contract (pre-scale guard):** until the shared hold engine owns a typed
+  phase, rep-counted holds must report `setup`, `holding`, `dropping`, `resting`, or `reArming`.
+  Shared constants replace scattered literals, and the adapter checks every hold phase: an unknown
+  key logs once in release and asserts in debug. This is deliberately not the deferred engine/enum
+  extraction.
 - **criticalFault/softFault: identical real-time rules**; persistence + same-fault-once bookkeeping
   unit = the hold, which under the plank model IS the rep — the rep-fleet machinery (same-fault-
   once, cross-rep persistence, reminder at the next hold's re-entry into holding) maps directly.
 - **Hustle flavors:** milestone-paired (primary) + final-third pose-break arms / re-hold commit
   fires (secondary, quiet-side).
 - **No timeout ending.** Walk-away = presence gate; stuck = setup_position re-tell; give-up = quit.
-- Setup intro / activation countdown / set-complete / GuidanceSignal safety: modality-independent,
-  unchanged. Yoga/stretch register deferred (VoiceScript config: reduced milestones, empty hustle).
+- Setup intro / activation countdown / GuidanceSignal safety: modality-independent, unchanged.
+  Set-complete: modality-independent but re-ruled 07-12 round 2 — the end tone, not a spoken line
+  (§ Setup / structure). Yoga/stretch register deferred (VoiceScript config: reduced milestones,
+  empty hustle).
 
 ## Post-set — deterministic, and the richest moment
-Set-complete line always; then the summary carries the dense feedback: single dominant fault to
+End tone always (07-12 round 2 — the non-verbal "time!" sound replaced the spoken set-complete
+line); then the summary carries the dense feedback: single dominant fault to
 fix next set + one highlight. (Summary/terminal feedback beats per-rep commentary for retention —
 this is already the interpreter's job, unchanged.)
 
@@ -524,7 +562,7 @@ this is already the interpreter's job, unchanged.)
 | # | Rule |
 |---|---|
 | 1 | No separate FORM-fault safety cue — a `criticalFault` firing real-time IS the injury reaction. (Setup/tracking-safety is a SEPARATE deterministic channel, rule 11.) |
-| 2 | Setup intro / ready / set-complete exactly once PER SET, always (`setup`); the intro is an unconditional one-shot broadcast at set start, never latched or re-fired; activation countdown "ba, hai, một" (counts DOWN, re-ruled 07-12) voiced deterministically synced to the hold (break → drop pending + restart from ba; first count fired while the intro still plays TERMINATES the intro); `holdStill` has no instruction line — the countdown is that state's audio (stuck-user re-tell → rule 11) |
+| 2 | Setup intro / ready / set-complete exactly once PER SET, always (`setup`) — set-complete's content is the non-verbal END TONE since 07-12 round 2 (replaced the spoken `common.set_complete`), fired as the final rep/hold lands; the intro is an unconditional one-shot broadcast at set start, never latched or re-fired; activation countdown "ba, hai, một" (counts DOWN, re-ruled 07-12) voiced deterministically synced to the hold (break → drop pending + restart from ba; first count fired while the intro still plays TERMINATES the intro); `holdStill` has no instruction line — the countdown is that state's audio (stuck-user re-tell → rule 11) |
 | 3 | EVERY landed rep is counted, deterministically and personality-immune (registration ruling 07-11; supersedes anchors+thinning — anchors/relief stay only as guards for an explicit re-thinned config) |
 | 4 | ~~Skipped counts still get a non-verbal tick~~ RETIRED 07-11 — no skipped counts exist under rule 3 |
 | 5 | First occurrence of a fault in a set is cued deterministically (100%); a fire blocked by the collision gap/cap keeps the credit — next occurrence is still deterministic |

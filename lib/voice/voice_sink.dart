@@ -32,7 +32,10 @@ abstract class VoiceSink {
   /// Resolves [logicalKey] via the active [VoiceSet], then plays the
   /// asset. Fire-and-forget from the caller's perspective — never throws,
   /// even for an unmapped key (see [VoiceSet]).
-  Future<void> playKey(String logicalKey);
+  Future<void> playKey(
+    String logicalKey, {
+    bool Function()? isStillRelevant,
+  });
 
   /// Resolves once the sink drains. The [timeout] is plumbed through to the
   /// underlying player so callers that must observe a genuine audio-end (the
@@ -112,7 +115,10 @@ class AssetVoiceSink implements VoiceSink {
   bool get isBusy => _busy;
 
   @override
-  Future<void> playKey(String logicalKey) async {
+  Future<void> playKey(
+    String logicalKey, {
+    bool Function()? isStillRelevant,
+  }) async {
     final resolved = voiceSet.resolve(logicalKey);
     if (resolved == null) {
       // Safe no-op (§5): never throw, just log + record for the
@@ -130,7 +136,10 @@ class AssetVoiceSink implements VoiceSink {
     // assetResolver) and its own safe no-op if the asset file itself is
     // missing from the bundle — this call is intentionally on the
     // original logical key, not a translated path.
-    await _player.speak(logicalKey);
+    await _player.speak(
+      logicalKey,
+      isStillRelevant: isStillRelevant,
+    );
     // QueuedAssetVoicePlayer doesn't expose a public isBusy/isPlaying
     // getter (only speak/waitUntilIdle/clearQueue/dispose — see
     // `queued_asset_voice_player.dart`), so `isBusy` is tracked here

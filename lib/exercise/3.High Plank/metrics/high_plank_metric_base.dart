@@ -4,7 +4,7 @@ import '../../../debug/debug_types.dart';
 export '../../../debug/debug_types.dart';
 export '../../fault_record.dart';
 
-enum HighPlankState { setup, holding, dropping }
+enum HighPlankState { setup, holding, dropping, resting, reArming }
 
 class HighPlankRepContext {
   final double shoulderHipAnkleAngle; // Đo thẳng người

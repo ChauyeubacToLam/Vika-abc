@@ -693,13 +693,22 @@ final List<ExerciseDefinition> exerciseDefinitions = [
     safetyWarning:
         'Dồn lực đều lên bàn tay, giữ cổ tay thẳng. Dừng lại nếu cổ tay đau.',
     videoAsset: 'assets/video/high_plank.mp4',
-    createExercise: ({int? reps, int? seconds}) =>
-        _withSeconds(seconds, (target) => HighPlank(maxSeconds: target)),
+    createExercise: ({int? reps, int? seconds}) {
+      assert(seconds != null, 'High Plank per-hold seconds must be supplied');
+      return HighPlank(
+        // Interim catalog rows are seconds-only. They remain one hold until
+        // the reps-of-holds catalog migration supplies base_reps.
+        maxHolds: reps ?? 1,
+        holdSeconds: seconds ?? 1,
+      );
+    },
     targetType: ExerciseTargetType.seconds,
     phaseColors: {
       'setup': const Color(0xFFFF6D00),
       'holding': const Color(0xFF00E676),
       'dropping': const Color(0xFF00B0FF),
+      'resting': const Color(0xFFFFD600),
+      'reArming': const Color(0xFFFFD600),
     },
   ),
   ExerciseDefinition(

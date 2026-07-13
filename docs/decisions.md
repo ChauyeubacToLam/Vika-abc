@@ -14,6 +14,134 @@ Alternatives considered: <what we rejected and why>
 
 ---
 
+## 2026-07-12 · ADR: two-modality catalog (rep-based + hybrid hold) + hybrid progression
+Status: active — Nam approved P1 (07-12): decisions 1 (two modalities) + 2 (seconds-axis hybrid
+progression) are committed and cleared for Codex. Decision 3 (count==1 UI) rides with P4; forks
+(a) label copy, (b) rep-based /1 rows, (c) bear-plank clock leniency remain OPEN and gate P3/P4,
+not P1. Resolves the OPEN impl item in "Holds count holds as REPS" (how a plank-model row carries
+both hold count and per-hold seconds) and the prod-severity `prescribeVolume` blocker in state.md.
+Problem: the catalog has three shapes — reps-only, seconds-only, and (since the plank-model flip)
+both-fields on high_plank/bear_plank. Every consumer enforces exactly-one-of
+(progression_rules.dart:348-349 discriminators, generator tool exit(1) guard), so the two hybrid
+rows crash plan generation (`prescribeVolume` StateError at recommendation_engine.dart:112) while
+being fully pool-eligible (verified 07-12: selection filters never check modality). Scaling holds
+adds N more hybrid rows; three modalities means every consumer carries a third branch forever.
+Decision (recommended, per Nam's framing 07-12):
+1. TWO modalities only. `base_reps` is ALWAYS set (unit count per set). `base_seconds` present ⇔
+   HYBRID hold (each unit = one hold of that many seconds); absent ⇔ rep-based. The four
+   seconds-only rows (butterfly, seated_forward_fold, side_plank_dip, sphinx) get `base_reps = 1`:
+   a long hold is the 1-unit case of reps-of-holds, same machine, different constants. The
+   `isHoldBased` discriminator dies.
+2. Hybrid progression: SECONDS is the only progression axis — existing hold path (tier start →
+   per-tier cap interpolation, deload factor, carry-over floor, variant unlock on the seconds cap).
+   Hold COUNT is a structural constant from the catalog, like sets: no tier bump, no weekly
+   interpolation.
+3. UI rule: hold count == 1 renders as pure time (no rep hero, no "1 ×"); count > 1 renders the
+   hybrid two-surface UI (High Plank pattern: time rings + rep hero).
+Why: one invariant (`base_seconds != null` = hold modality) that every consumer can check instead
+of three shapes — the current crash IS the drift cost of shape #3. Progressing seconds matches how
+the PT catalog is authored (per-tier `max_seconds_*` columns already exist) and keeps progression
+one-dimensional; hold count staying fixed mirrors how sets are prescribed.
+Alternatives considered: keep three modalities and add hybrid branches at every call site
+(rejected — permanent third branch, and the crash shows consumers won't stay in sync); progress
+hold count then seconds, or redistribute total time (rejected — two-axis progression with no PT
+basis; revisit with session data); default null reps to 1 in code without the data flip (rejected —
+the exactly-one guard keeps lying to readers and the catalog generator still exits).
+OPEN forks (Nam):
+(a) Hybrid volume label copy (e.g. "3 hiệp × 3 lần × 20 giây") — spec proposes, Nam owns copy.
+(b) Rep-based rows with reps=1 (downward_dog, prayer_pose, raised_arms) show a "/1" rep hero
+    today; left unchanged this pass (hiding it would leave them no progress surface).
+(c) Bear plank's clock flips form-gated → pose-validity-gated two-ring when it adopts the shared
+    engine. That follows the locked hold design but is MORE LENIENT than its current scoring
+    (back/weight faults become coached, not clock-stopping) — PT sanity-check wanted.
+Sequencing: P1 engine+data unbreak (progression rules hybrid path, variant unlock, generator
+guard, SQL base_reps=1 ×4, regen JSON) → P2 hold-engine extraction from High Plank
+(behavior-preserving) → P3 bear plank onto the engine + its voice pools (second consumer proves
+the contract) → P4 UI generalization (count==1 pure-time rendering, intro band, labels).
+Artifacts (Nam: lavish skipped per 07-12 instruction; design annotations live inside the specs):
+docs/scratch/hold-hybrid-modality-codex-spec.md + hold-engine-extraction-codex-spec.md.
+
+## 2026-07-12 · High Plank pre-scale safety contract
+Status: active — implemented and covered before the hold pattern is cloned.
+Decision:
+- A base pause/re-hold discards the CURRENT partial High Plank hold. Completed holds, rep logs, and
+  set progress survive. This is intentionally different from an in-exercise `dropping` wobble,
+  which pauses and resumes earned time. The reset runs in `onPauseReactivationStarted`: despite the
+  name, the base calls it on the resume edge before any exercise update, which is the earliest safe
+  point to kill the stale tick.
+- `TimerMetric` and `HoldSecondsAccumulator` share the same valid inter-frame delta range. Gaps
+  outside that range are dropped, so a pause, camera interruption, or janky frame cannot be credited
+  as held time by one clock while the other rejects it.
+- Until the deferred shared hold engine owns a typed phase model, rep-counted holds use one named
+  string contract (`setup`, `holding`, `dropping`, `resting`, `reArming`). The voice adapter checks
+  every reported phase and fails loud: one release log plus a debug assertion for an unknown key.
+- Rep-counted-hold milestone praise and hustle pools are required configuration. Empty pools get the
+  same release-log/debug-assert treatment; no fallback line is invented. Rep exercises never enter
+  either hold-only guard.
+Why: Reset + delta-gating is defense in depth for data honesty; either one blocks the false-perfect
+completion. Discarding the partial attempt matches the base pause ritual: the user must re-prove the
+start pose and earn a fresh continuous hold. The string/pool guards make future hold wiring fail
+visibly without prematurely extracting a one-consumer state machine or hiding missing content behind
+a generic fallback.
+Alternatives considered: reset only after the resume hold completes (rejected — stale state survives
+too long); clamp a large frame gap (rejected — it still invents earned time); typed hold phase enum now
+(deferred to the bear-plank/shared-engine design); fallback praise/hustle content (rejected — it masks
+an invalid voice footprint).
+
+## 2026-07-12 · High Plank device-tune (first on-device pass) — 3 fixes + 1 dropped
+Status: active — Nam's calls from the first High Plank device smoke (07-12). The pilot works
+end-to-end (3 holds, countdown, both tones, rest re-arm all confirmed in-log); these are polish.
+Decisions:
+1. **Within-hold milestone ALWAYS speaks an outcome — never silent.** Supersedes the round-2
+   "neither wins → time line alone" bullet: at each milestone the time line is followed
+   DETERMINISTICALLY by praise OR hustle (no probability miss, no silent slot). Keep the
+   clean→praise / struggling-or-final-stretch→hustle switch and never-praise-twice; when the
+   switch would land on a suppressed/failed roll, fall through to the other so SOMETHING always
+   fires. (Device read: "Được một nửa rồi" landing alone in silence felt dead — Nam wants an
+   encouragement every mark.)
+2. **Outer-ring needs a HORIZONTALITY gate, not tighter angle thresholds.** A standing/walking
+   user reads as a valid plank because shoulder-hip-ankle / arm / knee angles are all ~180° when
+   upright too — geometrically identical to a plank on the current outer-ring terms, so no
+   threshold value catches "walked around." Fix: add a torso-orientation term (plank torso is
+   horizontal; standing is vertical) to the outer-ring exit so standing drops the hold. Nam's
+   "tighten the threshold" instinct won't work; the orientation gate is the real fix.
+3. **Re-arm REUSES the existing set-start setup instruction WHOLE — UI *and* its voice — nothing
+   new (Nam clarified twice).** Not a bespoke silent ring: use the setup_position machinery the
+   exercise already has. Because it's set-start's machinery, it behaves exactly like set-start —
+   when the user is in frame + correct orientation but not yet in the pose, the existing "get
+   into position" UI + its voice fire; when the user IS already posed, it goes straight to 3-2-1
+   (quiet). So the voice appears ONLY when the user actually needs the prompt, never on a clean
+   re-arm — no per-hold spam. "Just make sure that UI and that voice work correctly after a
+   break." Current bugs blocking that: (a) resting→reArming only advances inside processPose, so
+   leaving the frame freezes the machine in resting (ring stuck at 0); (b) the re-arm presented a
+   bespoke silent "Vào tư thế" ring gated behind guidanceCopy==null instead of reusing
+   setup_position. Fix: drive rest completion on a pose-independent time check, and publish the
+   real setup_position guidance (UI + voice) from re-arm so it IS set-start's behavior.
+   Mechanism confirmed (Opus, verified in code): the setup-voice producer
+   `_SetupSafetyVoiceController.processFrame` is SIGNAL-driven off `exercise.guidanceSignal` (not
+   exerciseState), runs every frame incl. mid-set, so High Plank just re-emits
+   `GuidanceSignal.setupPosition`/`holdStill` from reArming — no change to checkExerciseState or
+   the base voice controller, can't leak into set-start. Copy = set-start's own "Vào vị trí".
+   TIMING CHOICE (Opus, needs Nam confirm): UI banner shows immediately when out of pose, but the
+   VOICE uses set-start's DELAYED stuck-user re-tell (~10s) — fast clean re-arm SILENT, only a
+   genuinely-stuck user is told (no per-hold "vào vị trí" spam). Latch must re-arm on the re-arm
+   presence edge, time ~10s from there (device item). Nam can ask for a faster voice if ~10s
+   feels too long after a break.
+   RING OVERRIDE (Nam, 07-12 device): Opus's design routed the re-arm 3-2-1 through the LEGACY
+   `_CenterOverlay` set-start gauge ("no new widget"). Nam rejected it — the count must render in
+   the NEW `RestCountdownRing` (hold-pilot ring design) for visual consistency. Impl: get-into-
+   position = the reused setup banner (not-posed); once posed, guidance clears + `_CenterOverlay`
+   is hidden during re-arm + `RestCountdownRing` shows the 3-2-1 (remaining=3s×(1−activationProgress)).
+4. **Re-arm voice-silent ruling SUPERSEDED by #3.** The earlier "re-arm is voice-silent"
+   (07-12 round 2, "Inter-hold rest RULED" REFINED bullet) is REVERSED: the re-arm reuses
+   set-start's setup_position which speaks its "get into position" line when the user isn't posed.
+   This is NOT "introducing a new line" — it's the existing setup voice, per #3. Still dropped:
+   the side_orientation break spam is left AS-IS ("not the problem, don't fix it").
+   Propagated 07-12: hold-rest-design.html's current-code banner, voice-behavior-spec.md § Hold-based,
+   and the earlier "Inter-hold rest RULED" bullets all re-point to #3.
+Owner: Opus design (esp. #2 CV geometry) → Codex impl; Nam reviews. Full record: state.md
+device-smoke block.
+
 ## 2026-07-12 · Hustle is fleet-wide hesitation encouragement, not intensity pressure
 Status: active — Tier 3 wired across every rep exercise 07-12; the six fast/quirky exercises retain
 the standard policy temporarily and carry explicit follow-up TODOs.
@@ -90,6 +218,87 @@ infrastructure (only Surya, voice-null, ever referenced it) — do NOT re-add it
 Alternatives considered: keep phase cues as a squat-only nicety — rejected; it's the exact legacy
 behaviour the redesign removed everywhere else.
 
+## 2026-07-12 · Inter-hold rest RULED: per-hold re-activation ritual + HYBRID modality
+Status: active — Nam's rulings via the hold-rest-design.html lavish review (7 notes + freeform,
+07-12 late). The PROPOSAL's V2/V3/U3 recommendations were RE-SHAPED by Nam; V1/U1/U2 land as
+proposed. Nam's freeform mandate: "everything I said is what I want… there is some overlap, not
+really clean — make it cleaner" → Opus design v2 (cleanup) owns reconciling the overlaps.
+Decision:
+- **V1 — rest start is silent**, screen-only; the amber rest ring appearing is the signal.
+- **V2 RE-SHAPED — re-entry is a full re-activation ritual, every hold:** when the rest timer
+  completes (timed edge, restElapsed >= REST_DURATION — honest, it's a real timer) fire a
+  rest-end tone; then a setup-register instruction line ("rest done, get into the pose"); then,
+  once the pose is confirmed, the SAME "ba, hai, một" activation countdown as exercise start;
+  the next hold's clock starts only when the countdown lands. The hold timer must never run
+  while the user isn't actually in the exercise (Nam's why).
+- **V3 folded into V2:** the rest-end tone + instruction IS the dead-system nudge; no separate
+  `common.hold_reengage` one-shot. (User who still never re-poses = stuck-user re-tell
+  territory; design v2 resolves.)
+- **No predictive spoken rest countdown** (confirmed): the rest-end tone marks time-done.
+- **U1 EXPANDED — three modalities: time-based, rep-based, HYBRID.** Former hold-based homework
+  exercises become HYBRID: the time/hold rings AND the rep-tracking UI both render ("hybrid also
+  needs to keep track of the reps — the same UI of checking reps needs to be there as well").
+  The isTimeBased pin-true fence stands; the hybrid UI composition is design v2's job.
+- **U2 — option B:** typed `liveRestSeconds` / `liveRestTargetSeconds` getters replace the
+  'Nghỉ X.Xs' regex parse.
+- **U3 — overrun visual:** the drained ring flips to a setup-style "Vào tư thế" instruction,
+  the visual twin of the V2 audio flow.
+- RESOLVED (Nam, 07-12 follow-up chat — delegated the finalize): rest-end tone = SIBLING sound
+  (not end_tone.mp3 reuse; two identical bells ~5s apart would mean both "work done" and "rest
+  done"). LANDED: assets/audio/common/rest_end_tone.mp3 (1.0s bell ding, CC0
+  freesound.org/s/192761). ~~Instruction: rest-over cue reuses the exercise's `setup_position`
+  line, fired IFF not posed; stuck-user re-tell = same line ~10s later~~ SUPERSEDED same day
+  (next bullet). Ring text "Vào tư thế" stands (UI copy, not audio).
+- REFINED (Nam, 07-12) then **PARTLY SUPERSEDED 07-12 device-tune #3** (voice-silence reversed):
+  (a) ~~NO instruction voice at rest re-entry~~ SUPERSEDED — the re-arm now REUSES set-start's
+  setup_position UI + voice (speaks "get into position" only when the user isn't posed, quiet
+  when posed). See "High Plank device-tune" #3/#4. The ritual is rest_end_tone → set-start setup
+  behavior (UI + its voice as needed) → pose → "ba, hai, một" → clock. STILL TRUE from this
+  bullet: the final countdown + tone shape; the drop-path (form break) still skips the ritual.
+  (b) NO guidance grace during re-arm: the ~3.5s set-start fallback (and intro-span grace) do
+  NOT apply mid-set — the user is already in frame, just resting on the floor; guidance signals
+  run ungraced there. Set-START grace behavior is unchanged. (Claude's interpretation of "remove
+  the defer 3.5" = the rest re-arm only, not the set-start fallback fleet-wide — flagged to Nam.)
+  Implementation clarification (Codex, 07-12, accepted): "voice-silent" means no
+  instruction/coaching voice — real SAFETY guidance (orientation, body-in-frame) still speaks
+  during re-arm, ungraced, per (b); the two sub-rulings compose, they don't conflict.
+Why: reusing the trained activation ritual (tone → instruction → pose → ba-hai-một) makes every
+hold start identical to the exercise's first activation — zero new grammar — and keeps the clock
+honest. Supersedes the hold-voice impl spec's verified reuse note ("none re-fire per hold"): the
+activation countdown now re-arms per hold BY DESIGN.
+
+## 2026-07-12 · Hold voice round 2: SPOKEN final countdown (pips dropped), end tone kept + goes fleet-wide, inter-hold rest surfacing OPEN
+Status: active — Nam's rulings, hold-design lavish review round 2 (4 notes, 07-12). Supersedes the
+"Final countdown is NON-VERBAL" bullet of the 07-11 hold entry below (and §04 of
+hold-exercise-voice-design.html — doc needs a v3 sync); everything else there stands.
+Decision:
+- **Final countdown is SPOKEN — "năm, bốn, ba, hai, một"** on the hold's last 5 earned seconds
+  (reuses `count_5..count_1`). The final-3 earcon pips are DROPPED for v1 ("not really that
+  important right now — we can still say it with the voice"). This reverses 07-11's
+  "spoken countdown robot-counts" rejection; the escape hatch flagged there made it a
+  content-level swap, which is what happened.
+- **End tone STAYS** (one distinct "time!" sound as earned time hits the per-hold target) — and
+  EXTENDS to rep-based exercises (confirmed by Nam in chat, 07-12): the tone REPLACES the spoken
+  `common.set_complete` line, fired as the set's final rep lands (with that rep's numeral, same
+  once-per-set latch). Hold sets inherit for free: the last hold's per-hold tone IS the set
+  marker; no spoken set-complete anywhere. Channel-consistent: "set done" is state, and sounds
+  carry state. RULED (07-12 chat, follow-up): the exercise's LAST set additionally speaks
+  `common.exercise_complete` (already recorded) on top of the tone — the coach's goodbye; a
+  bell-only workout ending reads cold. All other sets: tone only. The recorded
+  `common.set_complete` asset goes unwired (flag, don't delete); its missing-audio.md
+  listen-check is moot. End-tone asset: assets/audio/common/end_tone.mp3 (Nam-picked, CC0
+  freesound.org/s/157277).
+- **Milestones stay short spoken words** ("còn 10 giây", halfway) while the UI clock counts down
+  independently — the voice/UI mismatch is accepted; voice never per-second-counts outside the
+  final countdown.
+- **OPEN — inter-hold rest surfacing:** the breather between holds needs (a) a voice treatment
+  (announce/close the rest) and (b) a UI ring/timer for the rest period — currently missing
+  entirely (Nam: "missing the rings showing time for break between two reps"). Un-designed;
+  needs a design pass before the impl spec closes.
+Why: device/lavish read — Nam wants the last seconds audible in words, not an abstract beep
+grammar; the end tone still earns its place as the unmistakable "done" marker and generalizes
+cleanly to rep-based sets.
+
 ## 2026-07-12 · Holds count holds as REPS (plank model) — supersedes "a set = one continuous hold"
 Status: active — Nam's ruling, 07-12 chat ("rep count needs to act exactly like plank"). Refines
 the 07-11 hold entry below: its sets-normalization bullet is SUPERSEDED, everything else stands.
@@ -107,7 +316,8 @@ registration, RepLogs, reminder edges) instead of inventing hold-only variants.
 Data corollary: the v1 catalog SQL (applied 07-12) wrongly nulled base_reps on plank/cobra/
 warrior_one — misread their hold count as a mis-encoding — which flips them into _resolveVolume's
 hold path and hits the _withReps reps!=null assert at launch. Corrective v2 in
-docs/scratch/hold-catalog-hybrid-fix.sql restores them; high_plank/bear_plank stay seconds-shaped
+docs/scratch/hold-catalog-hybrid-fix.sql restores them (APPLIED + read back 07-12: base_reps
+3/3/2 confirmed); high_plank/bear_plank stay seconds-shaped
 until the code migration lands, then flip plank-shaped. OPEN (impl spec): how a plank-model row
 carries BOTH hold count and per-hold seconds without flipping _resolveVolume's
 seconds-means-hold modality inference.
@@ -126,11 +336,13 @@ Decision, the shape (High Plank = pilot):
 - **Voice milestones, relative rule any duration:** halfway + "còn 10 giây", deterministic,
   earned-time crossings. NO spoken per-second countdown — a coach says "10 seconds left", never
   "10, 9, 8". Voice speaks REMAINING; the UI ring stays as-is (coach = person, screen = tool).
-- **Final countdown is NON-VERBAL:** 3 identical beeps on the last 3 earned seconds + a distinct
-  end tone (the universal timer beep grammar — zero teaching needed). No continuous tick in v1
-  (research: anxiety cost + clashes with voice). Spoken-numeral swap stays a one-line change.
+- ~~**Final countdown is NON-VERBAL:** 3 identical beeps on the last 3 earned seconds + a distinct
+  end tone~~ SUPERSEDED 07-12 (round-2 entry above): countdown is SPOKEN "năm…một", pips dropped,
+  end tone kept. Still true from this bullet: no continuous tick in v1.
 - **Milestone outcome slot SWITCHES praise/hustle by measured state:** clean since last milestone
-  → praise roll; struggling/final stretch → hustle roll; neither wins → time line alone. Never
+  → praise roll; struggling/final stretch → hustle roll; ~~neither wins → time line alone~~
+  SUPERSEDED 07-12 device-tune (always fires praise-or-hustle, never silent — see "High Plank
+  device-tune" entry). Never
   praise two consecutive milestones. Hustle's second flavor: final-third pose-break arms, re-hold
   commit fires (quiet-side roll).
 - **criticalFault/softFault real-time during the hold, rep-fleet rules unchanged**; persistence +
@@ -145,7 +357,8 @@ Why: users come to be coached on faults — freezing the clock on every fault is
 coach (Nam); milestones are a hold's only structural moments, so outcome cues anchor there; the
 beep grammar is already trained into every phone user; timeout was an arbitrary third ending.
 Alternatives rejected: form-gated earned time (v1 proposal — punitive), spoken "năm-bốn-ba-hai-một"
-final countdown (robot-counts), praise-only milestone pairing (praises bad holds), keeping timeout
+final countdown (robot-counts — REVERSED 07-12 round 2: Nam ruled spoken after device/lavish read),
+praise-only milestone pairing (praises bad holds), keeping timeout
 at 15-20min (dead mechanism once the clock runs through faults).
 Out of scope, deferred: yoga/stretch register (VoiceScript config: reduced milestones, no hustle);
 audio wordings (structure ships first, missing keys are safe no-ops — Nam records later).

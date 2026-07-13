@@ -33,7 +33,7 @@ class QueuedAssetVoicePlayer {
   final String? Function(String text)? assetResolver;
   final String logTag;
   final AudioPlayer _audioPlayer = AudioPlayer();
-  final List<String> _queue = [];
+  final List<_QueuedPhrase> _queue = [];
   final List<Completer<void>> _idleWaiters = [];
 
   late final StreamSubscription<void> _completionSubscription;
@@ -71,7 +71,10 @@ class QueuedAssetVoicePlayer {
     }
   }
 
-  Future<void> speak(String text) async {
+  Future<void> speak(
+    String text, {
+    bool Function()? isStillRelevant,
+  }) async {
     if (_isDisposed) {
       return;
     }
@@ -81,7 +84,9 @@ class QueuedAssetVoicePlayer {
       return;
     }
 
-    _queue.add(phrase);
+    _queue.add(
+      _QueuedPhrase(text: phrase, isStillRelevant: isStillRelevant),
+    );
     debugPrint('[$logTag] queued: $phrase');
     if (!_isPlaying && !_isClearingQueue) {
       unawaited(_processQueue());
@@ -163,9 +168,29 @@ class QueuedAssetVoicePlayer {
       }
     }
 
-    final text = _queue.removeAt(0);
+    _QueuedPhrase? next;
+    while (_queue.isNotEmpty && next == null) {
+      final candidate = _queue.removeAt(0);
+      var relevant = true;
+      try {
+        relevant = candidate.isStillRelevant?.call() ?? true;
+      } catch (error) {
+        relevant = false;
+        debugPrint('[$logTag] stale check failed: $error');
+      }
+      if (relevant) {
+        next = candidate;
+      } else {
+        debugPrint('[$logTag] skipped stale: ${candidate.text}');
+      }
+    }
+    if (next == null) {
+      _isPlaying = false;
+      _notifyIdleWaitersIfNeeded();
+      return;
+    }
     try {
-      final started = await _playText(text);
+      final started = await _playText(next.text);
       if (!started) {
         _isPlaying = false;
         _notifyIdleWaitersIfNeeded();
@@ -249,4 +274,11 @@ class QueuedAssetVoicePlayer {
       await _audioPlayer.dispose();
     } catch (_) {}
   }
+}
+
+class _QueuedPhrase {
+  const _QueuedPhrase({required this.text, this.isStillRelevant});
+
+  final String text;
+  final bool Function()? isStillRelevant;
 }

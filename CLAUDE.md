@@ -174,7 +174,9 @@ Two parallel theme registers, DO NOT MIX:
   VikaIvoryMain.tabularFigures.
 - v5 onboarding: self-contained V5.* namespace in lib/screens/onboarding/v5/v5_theme.dart +
   v5_primitives.dart. Do not import V5 into main-app screens or vice versa.
-Legacy jade-green VFTheme still backs exercise/auth screens. Don't extend it.
+Legacy jade-green VFTheme still backs auth screens; the ACTIVE EXERCISE screen is styled with
+VikaIvory tokens (class lives alongside VFTheme in lib/theme/vf_theme.dart — verified 07-12).
+Don't extend VFTheme.
 Stage hero pattern (Home/Plan/Library): full-bleed dark stage hero at top, bleeds past MainShell
 SafeArea via MediaQuery.removePadding(removeTop: true); warm-dark gradient, film grain uses
 Random(seed) never time-based. Follow the same shape when adding a primary tab.

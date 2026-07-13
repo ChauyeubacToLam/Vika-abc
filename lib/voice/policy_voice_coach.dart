@@ -27,6 +27,7 @@ import '../exercise/exercise_base.dart';
 import '../exercise/fault_record.dart';
 import '../utils/debouncer.dart';
 import '../utils/exercise_logger.dart';
+import 'earcon_player.dart';
 import 'voice_coach.dart';
 import 'voice_content.dart';
 
@@ -56,12 +57,20 @@ class PolicyVoiceCoach implements ExerciseVoiceCoach {
   /// lines fire over the intro tail. Sized well past any real intro.
   static const Duration _introIdleTimeout = Duration(seconds: 30);
 
+  // Feel-tune guards for short holds. Final-10 needs a 5s gap after halfway;
+  // spoken 5..1 starts only when it also has a 5s gap after halfway.
+  static const double kMinHalfwayHoldSeconds = 10.0;
+  static const double kMinFinalTenHoldSeconds = 30.0;
+  static const double kMinSpokenCountdownHoldSeconds = 20.0;
+
   PolicyVoiceCoach({
     required this.script,
     required VoiceCoach coach,
+    EarconSink? earcon,
     this.targetReps,
     this.countsByRepNumber = true,
-  }) : _coach = coach;
+  })  : _coach = coach,
+        _earcon = earcon ?? EarconPlayer();
 
   /// This exercise's footprint: which pools + which fault ids + (if any)
   /// phase cues.
@@ -80,6 +89,7 @@ class PolicyVoiceCoach implements ExerciseVoiceCoach {
   final bool countsByRepNumber;
 
   final VoiceCoach _coach;
+  final EarconSink _earcon;
   final _SetupSafetyVoiceController _setupSafetyController =
       _SetupSafetyVoiceController();
 
@@ -127,6 +137,18 @@ class PolicyVoiceCoach implements ExerciseVoiceCoach {
   final Set<int> _countdownSpoken = <int>{};
   bool _holdCountingActive = false;
   bool _resumeReactivationPending = false;
+
+  int? _lastEndToneRep;
+  String? _lastHoldPhaseKey;
+  int? _trackedHoldRepNumber;
+  double? _previousHoldSeconds;
+  final Set<String> _holdMilestonesFired = <String>{};
+  final Set<int> _holdCountdownSpoken = <int>{};
+  bool _cleanSinceLastHoldMilestone = true;
+  bool _lastHoldMilestoneWasPraise = false;
+  bool _rehHoldHustleArmed = false;
+  bool _holdPoolsValidated = false;
+  final Set<String> _reportedHoldContractIssues = <String>{};
 
   @override
   void processFrame({
@@ -213,7 +235,10 @@ class PolicyVoiceCoach implements ExerciseVoiceCoach {
     // The end edge also stamps _introAudioEndMs frame-synchronously: the
     // stuck-user re-tell's delay floor, stamped in BOTH branches below because
     // the re-tell needs a floor even when the intro produced no audio.
-    if (_introFired && !_introAudioEnded) {
+    if (_introFired &&
+        !_introAudioEnded &&
+        exercise.currentPhaseKey != REP_COUNTED_HOLD_PHASE_RESTING &&
+        !exercise.isReArmingHold) {
       exercise.beginGuidanceSignalGrace(nowMs: exercise.frameTimestampMs);
     } else if (_introAudioEnded && _introAudioEndMs == null) {
       _introAudioEndMs = exercise.frameTimestampMs;
@@ -251,10 +276,8 @@ class PolicyVoiceCoach implements ExerciseVoiceCoach {
     // the early return because it fires during notActivated.
     _handleActivationCountdown(exercise);
 
-    // common.ready on the activation edge; the set-complete line on the
-    // completion edge. Both deterministic, once per set (hard rule 2). Routed
-    // through CueType.setup so the collision gap / outcome slots never block
-    // them.
+    // common.ready on the activation edge; the end tone on the completion
+    // edge. Both deterministic, once per set (hard rule 2).
     if (justActivated && !_readySpoken) {
       _readySpoken = true;
       _coach.say(
@@ -263,12 +286,37 @@ class PolicyVoiceCoach implements ExerciseVoiceCoach {
         const CueContext(repNumber: 0, contentKey: 'ready'),
       );
     }
+
+    // Some exercise state machines land their final rep and flip the base to
+    // completed in the same frame. Drain that rep before the completion early
+    // return so count=registration still includes the final rep/hold.
+    if (justCompleted && repCount > _lastRepCount) {
+      _drainLiveFaults(exercise: exercise, repNumber: _trackedRepNumber);
+      _handleRepLanded(exercise: exercise, repCount: repCount);
+      _startTrackingRep(repCount + 1);
+      _lastRepCount = repCount;
+    }
     if (justCompleted && !_setCompleteSpoken) {
       _setCompleteSpoken = true;
-      _coach.say(
-        CueType.setup,
-        VoiceContent.key('common.set_complete'),
-        const CueContext(repNumber: 0, contentKey: 'set_complete'),
+      if (!exercise.usesRepCountedHolds || _lastEndToneRep != repCount) {
+        unawaited(_earcon.endTone());
+        _lastEndToneRep = repCount;
+      }
+      if (exercise.isFinalSet) {
+        _coach.say(
+          CueType.setup,
+          VoiceContent.key('common.exercise_complete'),
+          const CueContext(repNumber: 0, contentKey: 'exercise_complete'),
+        );
+      }
+    }
+
+    if (exercise.usesRepCountedHolds) {
+      _handleRepCountedHold(
+        exercise: exercise,
+        repCount: repCount,
+        canSpeak:
+            state == ExerciseState.activated && !exercise.isPaused && hasPose,
       );
     }
 
@@ -288,6 +336,10 @@ class PolicyVoiceCoach implements ExerciseVoiceCoach {
 
     final repIncreased = repCount > _lastRepCount;
     if (repIncreased) {
+      if (exercise.usesRepCountedHolds) {
+        unawaited(_earcon.endTone());
+        _lastEndToneRep = repCount;
+      }
       _drainLiveFaults(exercise: exercise, repNumber: _trackedRepNumber);
       _handleRepLanded(exercise: exercise, repCount: repCount);
       _startTrackingRep(repCount + 1);
@@ -328,6 +380,15 @@ class PolicyVoiceCoach implements ExerciseVoiceCoach {
     _setCompleteSpoken = false;
     _countdownSpoken.clear();
     _holdCountingActive = false;
+    _lastEndToneRep = null;
+    _lastHoldPhaseKey = null;
+    _trackedHoldRepNumber = null;
+    _previousHoldSeconds = null;
+    _holdMilestonesFired.clear();
+    _holdCountdownSpoken.clear();
+    _cleanSinceLastHoldMilestone = true;
+    _lastHoldMilestoneWasPraise = false;
+    _rehHoldHustleArmed = false;
   }
 
   /// Speaks the per-set intro pair back-to-back via CueType.setup, then arms the
@@ -377,8 +438,10 @@ class PolicyVoiceCoach implements ExerciseVoiceCoach {
   /// "go" cue.
   void _handleActivationCountdown(ExerciseBase exercise) {
     final holdMs = exercise.holdStillElapsedMs;
-    final holding =
-        holdMs != null && exercise.exerciseState == ExerciseState.notActivated;
+    final inActivationContext =
+        exercise.exerciseState == ExerciseState.notActivated ||
+            exercise.isReArmingHold;
+    final holding = holdMs != null && inActivationContext;
 
     if (holding) {
       _holdCountingActive = true;
@@ -392,7 +455,9 @@ class PolicyVoiceCoach implements ExerciseVoiceCoach {
           // dropped — the intro is one-shot and consumed, it never resumes),
           // mark intro-audio-end NOW so the voice grace closes with it and the
           // re-tell floor is stamped this same frame, then speak the count.
-          if (_introFired && !_introAudioEnded) {
+          if (exercise.exerciseState == ExerciseState.notActivated &&
+              _introFired &&
+              !_introAudioEnded) {
             _coach.stop();
             _introAudioEnded = true;
             _introAudioEndMs = exercise.frameTimestampMs;
@@ -418,7 +483,7 @@ class PolicyVoiceCoach implements ExerciseVoiceCoach {
     // The hold ended. A break (still notActivated) drops the perishable pending
     // counts so no stale count plays; activation (now activated) keeps the
     // queue so a mid-play "một" survives. Either way the tracker re-arms.
-    if (exercise.exerciseState == ExerciseState.notActivated) {
+    if (inActivationContext) {
       _coach.clearPending();
       debugPrint(
         '[VoiceSetup] hold BROKE — pending counts dropped, countdown '
@@ -428,6 +493,211 @@ class PolicyVoiceCoach implements ExerciseVoiceCoach {
     _holdCountingActive = false;
     _countdownSpoken.clear();
   }
+
+  void _handleRepCountedHold({
+    required ExerciseBase exercise,
+    required int repCount,
+    required bool canSpeak,
+  }) {
+    _validateRepCountedHoldContract(exercise);
+    final phase = exercise.currentPhaseKey;
+    final previousPhase = _lastHoldPhaseKey;
+    final enteredDropping = previousPhase != REP_COUNTED_HOLD_PHASE_DROPPING &&
+        phase == REP_COUNTED_HOLD_PHASE_DROPPING;
+    final enteredHolding = previousPhase != REP_COUNTED_HOLD_PHASE_HOLDING &&
+        phase == REP_COUNTED_HOLD_PHASE_HOLDING;
+    final enteredResting = previousPhase != REP_COUNTED_HOLD_PHASE_RESTING &&
+        phase == REP_COUNTED_HOLD_PHASE_RESTING;
+    final enteredReArming = previousPhase == REP_COUNTED_HOLD_PHASE_RESTING &&
+        phase == REP_COUNTED_HOLD_PHASE_RE_ARMING;
+    final target = exercise.liveHoldTargetSeconds;
+    final live = exercise.liveHoldSeconds;
+
+    if (enteredResting) {
+      _countdownSpoken.clear();
+      _holdCountingActive = false;
+    }
+    if (enteredReArming) {
+      unawaited(_earcon.restEndTone());
+    }
+
+    if (enteredDropping) {
+      _cleanSinceLastHoldMilestone = false;
+      if (target != null && live != null && live >= target * (2 / 3)) {
+        _rehHoldHustleArmed = true;
+      }
+    }
+
+    if (enteredHolding &&
+        previousPhase == REP_COUNTED_HOLD_PHASE_DROPPING &&
+        _rehHoldHustleArmed &&
+        canSpeak) {
+      _coach.say(
+        CueType.hustle,
+        VoiceContent.pool(script.hustlePool),
+        CueContext(
+          repNumber: repCount + 1,
+          sinkBusy: _coach.isBusy,
+        ),
+      );
+      _rehHoldHustleArmed = false;
+    }
+    _lastHoldPhaseKey = phase;
+
+    if (!canSpeak ||
+        phase != REP_COUNTED_HOLD_PHASE_HOLDING ||
+        target == null ||
+        live == null) {
+      return;
+    }
+
+    final inProgressHold = repCount + 1;
+    if (_trackedHoldRepNumber != inProgressHold) {
+      _trackedHoldRepNumber = inProgressHold;
+      _previousHoldSeconds = 0.0;
+      _holdMilestonesFired.clear();
+      _holdCountdownSpoken.clear();
+      _cleanSinceLastHoldMilestone = true;
+      _rehHoldHustleArmed = false;
+    }
+
+    if (exercise.liveFaults.isNotEmpty) {
+      _cleanSinceLastHoldMilestone = false;
+    }
+
+    final previous = _previousHoldSeconds ?? live;
+    if (target >= kMinHalfwayHoldSeconds) {
+      _maybeFireHoldMilestone(
+        id: 'halfway',
+        key: 'common.time.halfway',
+        threshold: target / 2,
+        previous: previous,
+        current: live,
+        target: target,
+        repNumber: inProgressHold,
+      );
+    }
+    if (target >= kMinFinalTenHoldSeconds) {
+      _maybeFireHoldMilestone(
+        id: 'final_10',
+        key: 'common.time.10s_left',
+        threshold: target - 10,
+        previous: previous,
+        current: live,
+        target: target,
+        repNumber: inProgressHold,
+      );
+    }
+
+    if (target >= kMinSpokenCountdownHoldSeconds) {
+      for (var number = 5; number >= 1; number--) {
+        if (_holdCountdownSpoken.contains(number)) continue;
+        final threshold = target - number;
+        if (!_crossed(previous, live, threshold)) continue;
+        _holdCountdownSpoken.add(number);
+        final expiresAtEarnedSecond = threshold + 1;
+        _coach.say(
+          CueType.count,
+          VoiceContent.key('$number'),
+          CueContext(
+            repNumber: inProgressHold,
+            contentKey: 'hold_countdown_$number',
+          ),
+          isStillRelevant: () {
+            final now = exercise.liveHoldSeconds;
+            return exercise.currentPhaseKey == REP_COUNTED_HOLD_PHASE_HOLDING &&
+                exercise.repCount + 1 == inProgressHold &&
+                now != null &&
+                now < expiresAtEarnedSecond;
+          },
+        );
+      }
+    }
+    _previousHoldSeconds = live;
+  }
+
+  void _validateRepCountedHoldContract(ExerciseBase exercise) {
+    if (!_holdPoolsValidated) {
+      _holdPoolsValidated = true;
+      final emptyPools = <String>[
+        if (script.praisePool.isEmpty) 'praisePool',
+        if (script.hustlePool.isEmpty) 'hustlePool',
+      ];
+      if (emptyPools.isNotEmpty) {
+        _reportHoldContractIssue(
+          'empty-pools',
+          '${exercise.exerciseName} is a rep-counted hold but '
+              '${emptyPools.join(' + ')} is empty; deterministic milestone '
+              'outcomes would go silent.',
+        );
+      }
+    }
+
+    final phase = exercise.currentPhaseKey;
+    if (!REP_COUNTED_HOLD_PHASE_KEYS.contains(phase)) {
+      _reportHoldContractIssue(
+        'phase:$phase',
+        '${exercise.exerciseName} reports unsupported rep-counted-hold phase '
+            '"$phase". Expected one of $REP_COUNTED_HOLD_PHASE_KEYS.',
+      );
+    }
+  }
+
+  void _reportHoldContractIssue(String key, String message) {
+    if (!_reportedHoldContractIssues.add(key)) return;
+    debugPrint('[VoiceGuard] $message');
+    assert(false, message);
+  }
+
+  void _maybeFireHoldMilestone({
+    required String id,
+    required String key,
+    required double threshold,
+    required double previous,
+    required double current,
+    required double target,
+    required int repNumber,
+  }) {
+    if (_holdMilestonesFired.contains(id) ||
+        !_crossed(previous, current, threshold)) {
+      return;
+    }
+    _holdMilestonesFired.add(id);
+    _coach.say(
+      CueType.count,
+      VoiceContent.key(key),
+      CueContext(repNumber: repNumber, contentKey: id),
+    );
+
+    final isFinalStretch = threshold >= target * (2 / 3);
+    var wantHustle = !_cleanSinceLastHoldMilestone || isFinalStretch;
+    if (!wantHustle && _lastHoldMilestoneWasPraise) {
+      wantHustle = true;
+    }
+    if (wantHustle) {
+      _coach.say(
+        CueType.hustle,
+        VoiceContent.pool(script.hustlePool),
+        CueContext(repNumber: repNumber, force: true),
+      );
+    } else {
+      _coach.say(
+        CueType.praise,
+        VoiceContent.pool(script.praisePool),
+        CueContext(
+          repNumber: repNumber,
+          clean: true,
+          formScore: 1.0,
+          force: true,
+        ),
+      );
+    }
+    _lastHoldMilestoneWasPraise = !wantHustle;
+    _cleanSinceLastHoldMilestone = true;
+  }
+
+  bool _crossed(double previous, double current, double threshold) =>
+      previous < threshold && current >= threshold;
 
   void _handleRepLanded({
     required ExerciseBase exercise,
@@ -978,7 +1248,10 @@ class PolicyVoiceCoach implements ExerciseVoiceCoach {
   }
 
   @override
-  void dispose() => _coach.dispose();
+  void dispose() {
+    _coach.dispose();
+    _earcon.dispose();
+  }
 }
 
 enum _SafetyVoiceClass {

@@ -82,11 +82,12 @@ void main() {
       final deadBug = DeadBug(maxRep: 7)..onSetComplete();
       final russianTwist = RussianTwist(maxRep: 6)..onSetComplete();
       final jumpSquat = JumpSquat(maxRep: 5)..onSetComplete();
-      final mountainClimber =
-          MountainClimber(maxRep: ClimberConfig.MAX_REP)..onSetComplete();
-      final superman = Superman(maxRep: SupermanConfig.MAX_REP)..onSetComplete();
-      final reverseCrunch =
-          ReverseCrunch(maxRep: ReverseCrunchConfig.MAX_REP)..onSetComplete();
+      final mountainClimber = MountainClimber(maxRep: ClimberConfig.MAX_REP)
+        ..onSetComplete();
+      final superman = Superman(maxRep: SupermanConfig.MAX_REP)
+        ..onSetComplete();
+      final reverseCrunch = ReverseCrunch(maxRep: ReverseCrunchConfig.MAX_REP)
+        ..onSetComplete();
 
       expect(birdDog.logger.setLogs['max_rep'], 8);
       expect(deadBug.logger.setLogs['max_rep'], 7);
@@ -107,7 +108,7 @@ void main() {
 
     test('hold exercises publish fault seconds without duplicate count keys',
         () {
-      final highPlank = HighPlank(maxSeconds: 30);
+      final highPlank = HighPlank(maxHolds: 1, holdSeconds: 30);
       highPlank.onSetComplete();
       highPlank.onSetComplete();
 
@@ -116,7 +117,7 @@ void main() {
       expect(highPlank.logger.setLogs['sagging_seconds'], 0.0);
       expect(highPlank.logger.setLogs['piked_seconds'], 0.0);
       expect(highPlank.logger.setLogs['elbow_seconds'], 0.0);
-      expect(highPlank.logger.repLogs, hasLength(1));
+      expect(highPlank.logger.repLogs, isEmpty);
 
       final bearPlank = BearPlank(maxSeconds: 30);
       bearPlank.onSetComplete();

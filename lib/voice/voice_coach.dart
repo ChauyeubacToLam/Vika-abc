@@ -47,7 +47,12 @@ class VoiceCoach {
   /// fire-and-forget it to the sink. Returns true only when the cue was
   /// accepted and dispatched, so adapters can mark "spoken" state without
   /// spending blocked attempts.
-  bool say(CueType type, VoiceContent content, CueContext ctx) {
+  bool say(
+    CueType type,
+    VoiceContent content,
+    CueContext ctx, {
+    bool Function()? isStillRelevant,
+  }) {
     if (content.keys.isEmpty) return false; // never requestable — no log spam
     final tag =
         '${type.name}${ctx.contentKey.isEmpty ? '' : '(${ctx.contentKey})'} '
@@ -65,7 +70,9 @@ class VoiceCoach {
       return false;
     }
     debugPrint('[Voice] $tag SPEAK $key — ${_policy.lastReason}');
-    unawaited(_sink.playKey(key));
+    unawaited(
+      _sink.playKey(key, isStillRelevant: isStillRelevant),
+    );
     if (_isOutcomeCue(type)) {
       // Generous timeout: the sink's default 4s resolves silently on timeout,
       // which stamped "audio ended" mid-line for lines >4s (hyperextension is

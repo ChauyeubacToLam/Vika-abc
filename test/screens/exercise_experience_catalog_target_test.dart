@@ -73,10 +73,35 @@ void main() {
     expect(spec.sets, 2);
     expect(spec.targetPerSet, 36);
     expect(spec.targetLabel, 'GIÂY/HIỆP');
+    expect(spec.hybrid, isTrue);
+    expect(spec.repHeroTarget, 1);
     expect(spec.secondsPerUnit, 1);
     expect(spec.timeBased, isTrue);
     expect(spec.exercise, isA<HighPlank>());
-    expect((spec.exercise as HighPlank).maxSeconds, 36);
+    expect((spec.exercise as HighPlank).maxHolds, 1);
+    expect((spec.exercise as HighPlank).holdSeconds, 36);
+  });
+
+  test('hybrid high plank catalog passes hold count and per-hold seconds', () {
+    final definition = lookupExerciseDefinition('high__plank')!;
+
+    final spec = debugBuildExerciseExperienceSpec(
+      definition,
+      catalogInfo: catalogInfo(
+        id: 'high__plank',
+        baseReps: 3,
+        baseSeconds: 30,
+      ),
+    );
+
+    final exercise = spec.exercise as HighPlank;
+    expect(spec.targetPerSet, 30);
+    expect(spec.targetLabel, 'GIÂY/HIỆP');
+    expect(spec.timeBased, isTrue);
+    expect(spec.hybrid, isTrue);
+    expect(spec.repHeroTarget, 3);
+    expect(exercise.maxHolds, 3);
+    expect(exercise.holdSeconds, 30);
   });
 
   test('catalog base reps are the fallback when prescription is absent', () {

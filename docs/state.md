@@ -6,6 +6,20 @@ Design / how-it-works -> the owning reference doc. If this file only grows, it's
 
 ## Now
 
+**Hold scale-up — DESIGNED (07-12), ADR provisional, Nam review pending.** Nam's framing 07-12:
+(1) extract the rep-counted-hold state machine out of High Plank (bear plank = real second
+consumer), (2) collapse catalog to TWO modalities — rep-based + hybrid (reps always set; seconds
+present = hold; former seconds-only rows get reps=1; reps==1 hides the rep UI). ADR: decisions.md
+07-12 "two-modality catalog" (3 OPEN forks inside: label copy, rep-based /1 rows, bear-plank clock
+leniency). Specs drafted, phased P1→P4: `docs/scratch/hold-hybrid-modality-codex-spec.md` (P1
+engine+data unbreak, incl. the SQL Nam runs — fixes the prescribeVolume blocker below) and
+`hold-engine-extraction-codex-spec.md` (P2 extraction behavior-preserving, P3 bear plank + voice
+pools + generic hybrid launch flag; P4 count==1 UI is spec'd only as scope). Lavish SKIPPED per
+Nam 07-12; design annotations live inside the specs.
+- **P1 APPROVED 07-12, cleared for Codex.** ADR decisions 1+2 active. NEXT: Codex implements P1 →
+  Nam runs the base_reps=1 SQL → regen JSON. This unblocks the prescribeVolume blocker below.
+- P2/P3/P4 still design-only; fork (c) gates P3, forks (a)/(b) + decision 3 gate P4.
+
 **Voice copy-writing skill — WRITTEN (07-11), Nam text-review pending, UNCOMMITTED.**
 `.agents/skills/voice-copy/SKILL.md`: grounding steps, cue formula (external target + no-assumption
 fence), per-slot templates, register, data honesty. Calls locked in decisions.md 07-11 "Voice-copy
@@ -37,24 +51,10 @@ Device-log observability across all cues (`[Voice]` / `[VoiceGuard]` / `[VoiceSe
   relief-4, praise 0.35 + D8 — count row already fixed); no-count cue type + behavior; per-rep
   speak-only-top-fault; multi-set intro dedupe (intro once per exercise).
 
-**Voice fleet rollout — Tier 1 COMMITTED (07-11, c9ed034), device-checked on squat+lunge.** All 24 in-scope
-rep exercises now select the rep-based policy bundle explicitly, inherit `targetReps`, write the
-three-key RepLog fault contract, and use normalized snake_case detector ids. Current faults are exposed
-for 23/24; Tricep Dip is the deliberate exception because its metric objects are never driven by the
-exercise, so Tier 1 provides setup/count/praise there without claiming fault detection. This fixes the
-Superman / Plank Up-Down / Walking Lunge time-based-bundle bug and the fleet-wide type/id filter bug.
-The obsolete bespoke exercise coaches and their isolated tests are removed after zero-call-site checks.
-No shared voice-engine code, detector thresholds, `affectsForm` values, hold exercises, Surya, Glute
-Bridge, or audio assets changed. Decision surface + code contradictions:
-`docs/reference/voice-coach/voice-fleet-tier1-review.html`; asset gaps:
-`docs/reference/voice-coach/missing-audio.md`. Scoped exercise/voice tests: 248 green; analyze clean.
-Full suite: 434 passed / 6 failed, all six the documented pre-existing 12px workout-summary overflow
-cluster; no fleet test failed.
-Device catch 07-11 (fixed in c9ed034): squat still narrated movement phases ("Xuống/Giữ/Đứng lên")
-via a retained `phaseCues` — removed (decisions.md "Squat stops narrating"); squat now fleet-standard.
-Also 07-11: all 166 fleet lines + 9 Tier-2 reminders GENERATED via vclip (Chi Mai, 64k/24kHz), legacy +
-dead Viettel audio archived off-tree to gitignored `archive_voice/` (for Drive backup). Loose orphan
-`16-30.mp3` count fallbacks KEPT (still wired, but old-voice — regen in Chi Mai if a plan uses >15 reps).
+**Voice fleet Tier 1 — SHIPPED (07-11, c9ed034), device-checked on squat+lunge.** Detail:
+decisions.md + `docs/reference/voice-coach/voice-fleet-tier1-review.html`; asset gaps
+missing-audio.md. Live gotcha kept: orphan `16-30.mp3` count fallbacks still wired but old-voice —
+regen in Chi Mai if a plan ever uses >15 reps.
 
 **Voice fleet Tiers 2 + 3 — IMPLEMENTED, UNCOMMITTED (07-12).** All 24 rep exercises verified; 27
 reachable soft ids have `softCuePools`, 20 selected continuous-critical faults have `reminderPools` +
@@ -78,25 +78,48 @@ mp3s and Tier-2/3 wiring are still uncommitted and belong in the same fleet comm
   ViettelTtsService class + its import in exercise_base.dart + constants token.
 - **Device residual** (from the 07-10 UI-instruction removal): plank rest-ring/hold-cue visuals → next device smoke.
 
-**Hold-based voice — behavior DECIDED (07-11, plank-model re-ruling 07-12), implementation NOT
-started.** Full record: decisions.md 07-11 "Hold-based voice behavior LOCKED" + 07-12 "Holds count
-holds as REPS"; behavior spec § Hold-based exercises; design doc hold-exercise-voice-design.html
-(v2, plank-model patch in flight). Shape: a set = N holds counted as REPS (plank.dart is the
-reference; High Plank migrates to maxHolds × holdSeconds, each completed hold speaks its number),
-pose-gated clock (only cheating stops earning), per-hold voice milestones (halfway + "còn 10 giây",
-speaks remaining, UI ring untouched), final-3 earcon beeps + end tone per hold (no spoken countdown,
-no tick v1), milestone praise/hustle switch, real-time faults (hold = the rep, fleet bookkeeping maps
-directly), 90s timeout deleted. High Plank pilot.
-- **NEXT:** Codex implements from docs/scratch/hold-voice-impl-spec.md (plank-model revision in
-  flight 07-12); audio wordings parked until structure lands (master record list in missing-audio.md;
-  new lines follow the voice-copy skill). Open in spec: how a plank-model catalog row carries both
-  hold count and per-hold seconds (_resolveVolume infers hold-ness from base_seconds != null);
-  firstOccurrenceCertain-as-factory-default awaiting Nam sign-off.
-- **URGENT (data, Nam runs):** the v1 catalog SQL (applied 07-12) BROKE plank/cobra/warrior_one
-  launches — it nulled base_reps, but their classes consume a hold count as reps (_withReps asserts
-  reps != null). Corrective v2 restores them → docs/scratch/hold-catalog-hybrid-fix.sql. high_plank/
-  bear_plank stay seconds-shaped (3 × one-hold interim) until the code migration lands, then flip
-  plank-shaped (flip SQL drafted in the same file, commented out).
+**Hold-based voice (High Plank pilot) — IMPLEMENTED, UNCOMMITTED, Nam line review + device retest
+pending (07-12).** Current code is reps-of-holds with outer-ring earned-time gating, inner-ring form
+coaching, spoken final countdown, per-hold tones, strict 5s rest, re-arm, typed rest getters, and the
+HYBRID time-rings + rep-hero UI. The device-tune follow-up has also landed:
+- Every hold milestone now pairs its deterministic time line with exactly one forced praise/hustle
+  outcome; the force flag is passed only by the hold-milestone adapter, so rep-path odds are unchanged.
+- Outer-ring entry/exit now include shoulder→hip torso tilt at ≤40° / >55° with the existing frame
+  debouncers; diagnostics log the value. Unit geometry admits the ~37° deep-sag fixture and drops an
+  ~84° upright fixture, but standing/walking/kneeling/pike/side-lying still need real-device readings.
+- Rest completion advances from pose and no-pose frames. Re-arm republishes the set-start
+  `setupPosition` signal: immediate "Vào vị trí" UI + existing delayed ~10s voice re-tell only when
+  stuck, then the ba-hai-một countdown. Re-arm stays ungraced. The unreachable drained-ring
+  `centerLabel` branch is deleted.
+  - **Device catch 07-12 (Nam) + FIXED (Claude):** the re-arm countdown ring wasn't showing, and
+    Opus's Fix-3 design had routed the count through the LEGACY `_CenterOverlay` set-start gauge —
+    Nam overrode: the re-arm 3-2-1 must render in the NEW `RestCountdownRing` (hold-pilot design).
+    Fixes: (1) high_plank.dart `_publishReArmGuidance` — once posed, clear guidance (lineless) so
+    no banner suppresses the ring; not-posed keeps the reused setup banner. (2)
+    active_exercise_page.dart — `_CenterOverlay` hidden during re-arm; `RestCountdownRing` now
+    renders the 3-2-1 fed by the re-arm hold-still countdown (remaining = 3s×(1−activationProgress),
+    total 3s), so the count reads in the amber ring like the rest ring. Test assertion updated
+    (re-arm lineless once posed). Device re-check pending.
+- **Pre-scale safety pass LANDED (Codex 07-12):** pause/resume now discards only the current partial
+  hold before any resumed update; completed holds/logs survive. `TimerMetric` shares the accumulator's
+  frame-delta gate, closing the false-perfect completion backstop. Rep-counted-hold phase names now
+  use one shared constant set with release-log/debug-assert validation; empty praise/hustle pools get
+  the same hold-only fail-loud guard. Measured hold time replaces the target constant in each RepLog;
+  no-pose interrupts now use the refreshed timestamp. The dead generic coach/helper block and
+  unreachable re-arm `centerLabel` call are deleted. Shared hold-engine extraction remains deferred
+  to the bear-plank design pass with a real second consumer.
+- Verification: `flutter analyze` clean; voice fleet + High Plank suite 119 passed. Full suite
+  458 passed / 6 failed — the 6 are ONLY the pre-existing 12px `workout_summary` overflow cluster
+  (unrelated). The stale `catalog_source_test` "hold entry carries seconds, not reps" was fixed
+  by Claude 07-12 (renamed → "hybrid hold entry carries per-hold seconds AND a hold-count reps",
+  now asserts high_plank baseReps=3 + baseSeconds=20 — matches the hybrid catalog flip; the test
+  encoded the dead pre-hybrid contract).
+- **NEXT:** Nam reviews the uncommitted stack in
+  `docs/reference/voice-coach/hold-pilot-code-review.html`, then device-retests the two outcome pairs,
+  standing/walking/kneeling/deep-sag/pike/side-lying tilt readings, clean/stuck/already-posed re-arm,
+  multiple holds, and 3s/10s/30s leave-frame/pause cases. Tone loudness and iOS/Android earcon overlap
+  remain device checks. Hybrid pre-exercise target copy stays deferred. The four yoga-pose fault-id /
+  `liveFaults` wiring mismatch remains a separate queued follow-up.
 
 **PresenceGate extraction (2026-07-05): SHIPPED, device smoke pending.** `lib/exercise/presence_gate.dart`
 extracted from `ExerciseBase` (~200 lines lighter), `PosePresenceSource` on `PersonDetector`, analyze
@@ -135,6 +158,16 @@ Progress Experience + Exercise Experience reference docs. Pending: device verify
    Ranked insights renders guided-empty until per-exercise builders land.
 
 ## Active blockers
+- **Hybrid catalog shape THROWS in the recommendation engine (07-12, prod-severity — DESIGN
+  LANDED, fix unimplemented).** high_plank + bear_plank carry BOTH base_reps AND base_seconds;
+  `prescribeVolume` (progression_rules.dart:56-63) hard-throws on both-fields rows at plan
+  generation (recommendation_engine.dart:112). Picker check DONE 07-12: both rows ARE
+  pool-eligible (selection never checks modality), so the crash is reachable in prod. Also
+  confirmed: `tool/generate_exercise_catalog.dart:69` still enforces exactly-one-of and would
+  exit(1) today (bundled JSON was hand-edited), and hybrid rows can never pass variant unlock
+  (progression_service.dart:308-318). The design answer (progress SECONDS, hold count is a
+  structural constant) is the 07-12 two-modality ADR; implementation = P1 spec
+  `docs/scratch/hold-hybrid-modality-codex-spec.md`. Blocked on Nam's ADR review, then Codex.
 - **No physical-Android full-session test yet** = the Android validation gate. Build + video + Firebase
   distribution work, but nobody has run a full session (camera + pose + rep-count + set-complete + mid-set
   back-guard) on a real ARM Android phone; emulator can't. Play Store also pending: switch

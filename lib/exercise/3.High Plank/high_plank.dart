@@ -1,9 +1,10 @@
 // ignore_for_file: non_constant_identifier_names, curly_braces_in_flow_control_structures
+import 'dart:math' as math;
+
 import 'package:vika/utils/debouncer.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../utils/pose_math_helpers.dart';
 import '../../utils/exercise_logger.dart';
-import '../../services/high_plank_voice_coach.dart';
 import '../exercise_base.dart';
 import 'metrics/high_plank_metric_base.dart';
 import 'metrics/sagging_metric.dart';
@@ -12,8 +13,7 @@ import 'metrics/elbow_metric.dart';
 import 'metrics/timer_metric.dart';
 
 class HighPlankConfig {
-  static const int TARGET_TIME_MS = 30000; // 30s form chuẩn
-  static const int TIMEOUT_MS = 90000; // 90s timeout
+  static const double REST_DURATION_SECONDS = 5.0;
 
   // Start Position (Tay duỗi, lưng thẳng, gối thẳng)
   static const double START_ARM_MIN = 140.0;
@@ -36,22 +36,37 @@ class HighPlankConfig {
   static const double DROPPING_ARM_ANGLE = 130.0;
   static const double DROPPING_KNEE_ANGLE = 125.0; // Gối cong quá
   static const double DROPPING_SAG_DEVIATION = 0.18; // Sụp hông > 12% chiều dài
+
+  // Outer anti-cheat ring. These are deliberately much looser than the form
+  // thresholds above: ordinary form faults stay coachable inside the hold.
+  static const double OUTER_ENTRY_BODY_MIN = 115.0;
+  static const double OUTER_ENTRY_ARM_MIN = 100.0;
+  static const double OUTER_ENTRY_KNEE_MIN = 100.0;
+  static const double OUTER_ENTRY_SAG_MAX = 0.38;
+  static const double OUTER_ENTRY_TORSO_TILT_MAX = 40.0;
+  static const double OUTER_EXIT_BODY_MIN = 105.0;
+  static const double OUTER_EXIT_ARM_MIN = 90.0;
+  static const double OUTER_EXIT_KNEE_MIN = 90.0;
+  static const double OUTER_EXIT_SAG_MAX = 0.45;
+  static const double OUTER_EXIT_TORSO_TILT_MAX = 55.0;
 }
 
 class HighPlank extends ExerciseBase {
   HighPlank({
-    required this.maxSeconds,
-  });
+    required this.maxHolds,
+    required this.holdSeconds,
+  }) : super(targetReps: maxHolds, targetSeconds: holdSeconds);
 
-  final int maxSeconds;
+  final int maxHolds;
+  final int holdSeconds;
 
   HighPlankState state = HighPlankState.setup;
   HighPlankState previousState = HighPlankState.setup;
-  String? lastHoldFaultVoiceMessage;
-
   int? _exerciseStartTimeMs;
-  bool _timeoutReached = false;
-  bool _setCompletionLogged = false;
+  int? _restStartMs;
+  int? _reArmHoldStartMs;
+  int _completedHoldingTimeMs = 0;
+  String? _outerBreakFaultId;
   final HoldSecondsAccumulator _holdSeconds = HoldSecondsAccumulator(const [
     'sagging_seconds',
     'piked_seconds',
@@ -88,7 +103,7 @@ class HighPlank extends ExerciseBase {
   String get exerciseName => 'High Plank';
 
   @override
-  ExerciseVoiceCoach? createVoiceCoach() => HighPlankVoiceCoach();
+  bool get usesRepCountedHolds => true;
 
   @override
   String get currentPhaseKey => state.toString().split('.').last;
@@ -102,7 +117,31 @@ class HighPlank extends ExerciseBase {
         return 'Giữ vững! Đang đếm giờ';
       case HighPlankState.dropping:
         return 'Mất form! Sửa lại ngay';
+      case HighPlankState.resting:
+        return 'Nghỉ';
+      case HighPlankState.reArming:
+        return 'Vào tư thế';
     }
+  }
+
+  @override
+  bool get isReArmingHold => state == HighPlankState.reArming;
+
+  @override
+  int? get holdStillElapsedMs {
+    if (!isReArmingHold) return super.holdStillElapsedMs;
+    final startedAt = _reArmHoldStartMs;
+    return startedAt == null ? null : frameTimestampMs - startedAt;
+  }
+
+  @override
+  double? get activationProgress {
+    if (!isReArmingHold) return super.activationProgress;
+    final elapsedMs = holdStillElapsedMs;
+    if (elapsedMs == null) return null;
+    return (elapsedMs /
+            ExerciseBase.HOLD_STILL_REQUIRED_DURATION.inMilliseconds)
+        .clamp(0.0, 1.0);
   }
 
   @override
@@ -112,17 +151,77 @@ class HighPlank extends ExerciseBase {
           : null;
 
   @override
-  double? get liveHoldTargetSeconds => maxSeconds.toDouble();
+  double? get liveHoldTargetSeconds => holdSeconds.toDouble();
+
+  @override
+  double? get liveRestSeconds {
+    final startedAt = _restStartMs;
+    if (state != HighPlankState.resting || startedAt == null) return null;
+    final elapsedSeconds = (frameTimestampMs - startedAt) / 1000.0;
+    return (HighPlankConfig.REST_DURATION_SECONDS - elapsedSeconds)
+        .clamp(0.0, HighPlankConfig.REST_DURATION_SECONDS);
+  }
+
+  @override
+  double? get liveRestTargetSeconds => HighPlankConfig.REST_DURATION_SECONDS;
+
+  @override
+  List<FaultRecord> get liveFaults {
+    if (state == HighPlankState.holding) {
+      return <FaultRecord>[
+        if (saggingMetric.isFaultingNow)
+          FaultRecord(
+            phase: state.name,
+            type: 'sagging',
+            message: 'Võng lưng',
+            affectsForm: true,
+            priority: 0,
+          ),
+        if (elbowMetric.isFaultingNow)
+          FaultRecord(
+            phase: state.name,
+            type: 'elbow',
+            message: 'Khuỷu tay bị gập',
+            affectsForm: true,
+            priority: 1,
+          ),
+        if (pikedHipMetric.isFaultingNow)
+          FaultRecord(
+            phase: state.name,
+            type: 'piked',
+            message: 'Hông nâng quá cao',
+            affectsForm: true,
+            priority: 2,
+          ),
+      ];
+    }
+    final breakId = _outerBreakFaultId;
+    if (state != HighPlankState.dropping || breakId == null) {
+      return const <FaultRecord>[];
+    }
+    return <FaultRecord>[
+      FaultRecord(
+        phase: state.name,
+        type: breakId,
+        message: 'Mất tư thế plank',
+        affectsForm: true,
+        priority: 0,
+      ),
+    ];
+  }
 
   @override
   GuidanceSignal? checkSafety(
       Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
     if (cameraFacing != CameraFacing.left &&
         cameraFacing != CameraFacing.right) {
+      _interruptReArm();
       return const GuidanceSignal.turnSide();
     }
     final lm = _getLandmarks(smoothedLandmarks);
     if (lm == null || !lm.values.every(ExerciseBase.isLandmarkConfident)) {
+      _interruptActiveHold('wall_guard');
+      _interruptReArm();
       return const GuidanceSignal.bodyInFrame();
     }
     return null;
@@ -250,14 +349,15 @@ class HighPlank extends ExerciseBase {
   }
 
   @override
-  bool requestStop() =>
-      _timeoutReached || timerMetric.totalHoldingTimeMs >= _targetTimeMs;
+  bool requestStop() => repCount >= maxHolds;
 
   @override
   Map<String, String> processNoPoseFrame() {
-    timerMetric.pause();
-    _holdSeconds.resetTick();
-    return super.processNoPoseFrame();
+    final feedback = super.processNoPoseFrame();
+    _interruptActiveHold('wall_guard');
+    _interruptReArm();
+    _advanceRestOnClock(frameTimestampMs);
+    return feedback;
   }
 
   @override
@@ -267,45 +367,57 @@ class HighPlank extends ExerciseBase {
   }
 
   @override
-  void onSetComplete() {
-    final formFaults = <FaultRecord>[
-      ...saggingMetric.faults,
-      ...pikedHipMetric.faults,
-      ...elbowMetric.faults,
-    ];
-    final holdCorrect = !formFaults.any((f) => f.affectsForm);
+  void onPauseReactivationStarted() {
+    if (state != HighPlankState.holding && state != HighPlankState.dropping) {
+      return;
+    }
 
-    final targetSeconds = maxSeconds.toDouble();
+    // A base pause/re-hold is a real interruption, unlike the exercise's
+    // brief dropping phase. Discard only the current partial hold; completed
+    // holds and their logs remain set progress.
+    _transitionState(HighPlankState.setup, frameTimestampMs);
+    _outerBreakFaultId = null;
+    correctForm = true;
+    resultIssues.phaseStatus.clear();
+    for (final metric in _metrics) {
+      if (!identical(metric, timerMetric)) {
+        metric.reset();
+      }
+    }
+  }
+
+  @override
+  void onSetComplete() {
+    final targetSeconds = (maxHolds * holdSeconds).toDouble();
     // Target denominator for scoring, not elapsed hold time.
     logger.pushKey("total_seconds", targetSeconds);
     logger.pushKey(
         "good_seconds", _holdSeconds.goodSeconds.clamp(0.0, targetSeconds));
-    logger.pushKey("max_rep", 1);
+    logger.pushKey("max_rep", maxHolds);
     logger.pushKey(
         "sagging_seconds", _holdSeconds.faultSecondsFor('sagging_seconds'));
     logger.pushKey(
         "piked_seconds", _holdSeconds.faultSecondsFor('piked_seconds'));
     logger.pushKey(
         "elbow_seconds", _holdSeconds.faultSecondsFor('elbow_seconds'));
-    logger.pushKey("total_perfect_time_ms", timerMetric.totalHoldingTimeMs);
-
-    if (!_setCompletionLogged) {
-      logger.addRepLog(RepLog(correctForm: holdCorrect, repNumber: 1, data: {
-        "perfect_hold_time": timerMetric.totalHoldingTimeMs / 1000.0,
-        "fault_types": formFaults.map((e) => e.type).toSet().toList(),
-      }));
-      _setCompletionLogged = true;
-    }
+    final currentPartialMs =
+        state == HighPlankState.holding || state == HighPlankState.dropping
+            ? timerMetric.totalHoldingTimeMs
+            : 0;
+    logger.pushKey(
+      "total_perfect_time_ms",
+      _completedHoldingTimeMs + currentPartialMs,
+    );
 
     logger.pushGoodRepCount();
 
     if (isDebugModeActive) {
       StringBuffer dump = StringBuffer();
       dump.writeln("=== DIAGNOSTIC LOG (HIGH PLANK) ===");
-      dump.writeln("Time(s) | State | S-H-A | S-E-W | HipDev");
+      dump.writeln("Time(s) | State | S-H-A | S-E-W | HipDev | TorsoTiltDeg");
       for (var log in _diagnosticLog) {
         dump.writeln(
-            "${log['time']} | ${log['state']} | ${log['body'].toStringAsFixed(1)} | ${log['arm'].toStringAsFixed(1)} | ${log['dev'].toStringAsFixed(2)}");
+            "${log['time']} | ${log['state']} | ${log['body'].toStringAsFixed(1)} | ${log['arm'].toStringAsFixed(1)} | ${log['dev'].toStringAsFixed(2)} | ${log['torso_tilt'].toStringAsFixed(1)}");
       }
       logger.pushKey("diagnostic_dump", dump.toString());
     }
@@ -316,15 +428,10 @@ class HighPlank extends ExerciseBase {
     final now = frameTimestampMs;
     _exerciseStartTimeMs ??= now;
 
-    if (now - _exerciseStartTimeMs! >= HighPlankConfig.TIMEOUT_MS) {
-      _timeoutReached = true;
-      return;
-    }
-
     final lm = _getLandmarks(landmarks);
     if (lm == null) {
-      timerMetric.pause();
-      _holdSeconds.resetTick();
+      _interruptActiveHold('wall_guard');
+      _interruptReArm();
       return;
     }
 
@@ -338,8 +445,8 @@ class HighPlank extends ExerciseBase {
     // Bổ sung chặn rác dữ liệu: Nếu đang tập mà có vật cản che khuất tay/chân/hông thì tạm bỏ qua frame này
     if (![shoulder, elbow, wrist, hip, knee, ankle]
         .every(ExerciseBase.isLandmarkConfident)) {
-      timerMetric.pause();
-      _holdSeconds.resetTick();
+      _interruptActiveHold('wall_guard');
+      _interruptReArm();
       return;
     }
 
@@ -353,11 +460,9 @@ class HighPlank extends ExerciseBase {
     )) {
       resultIssues.feedback['System'] =
           'Hãy chống tay trên sàn, không tập plank trên tường.';
-      if (state == HighPlankState.holding) {
-        _transitionState(HighPlankState.dropping, now);
-      }
-      timerMetric.pause();
-      _holdSeconds.resetTick();
+      _interruptActiveHold('wall_guard');
+      _interruptReArm();
+      _publishReArmGuidance();
       return;
     }
     double bodyAngle = calculateAngleNormalized(
@@ -366,6 +471,12 @@ class HighPlank extends ExerciseBase {
         firstPoint: shoulder, midPoint: elbow, lastPoint: wrist);
     double kneeAngle = calculateAngleNormalized(
         firstPoint: hip, midPoint: knee, lastPoint: ankle);
+    final torsoTiltDeg = math.atan2(
+          (shoulder.y - hip.y).abs(),
+          (shoulder.x - hip.x).abs(),
+        ) *
+        180 /
+        math.pi;
 
     double expectedHipY = _interpolateY(shoulder, ankle, hip.x);
     double rawDeviation = hip.y - expectedHipY;
@@ -379,12 +490,21 @@ class HighPlank extends ExerciseBase {
         'state': state.name,
         'body': bodyAngle,
         'arm': armAngle,
-        'dev': hipDeviation
+        'dev': hipDeviation,
+        'torso_tilt': torsoTiltDeg,
       });
       _lastDiagnosticTime = now;
     }
 
-    _updateStateMachine(bodyAngle, armAngle, hipDeviation, kneeAngle, now);
+    _updateStateMachine(
+      bodyAngle,
+      armAngle,
+      hipDeviation,
+      kneeAngle,
+      torsoTiltDeg,
+      now,
+    );
+    _publishReArmGuidance();
     final ctx = HighPlankRepContext(
       shoulderHipAnkleAngle: bodyAngle,
       shoulderElbowWristAngle: armAngle,
@@ -410,25 +530,24 @@ class HighPlank extends ExerciseBase {
       _holdSeconds.resetTick();
     }
 
-    repCount = timerMetric.totalHoldingTimeMs ~/ 1000;
-
     resultIssues.setPhaseStatus(state.name, currentPhaseLabel);
   }
 
-  int get _targetTimeMs => maxSeconds * 1000;
+  int get _targetTimeMs => holdSeconds * 1000;
 
   void _resetSetState() {
     state = HighPlankState.setup;
     previousState = HighPlankState.setup;
     _exerciseStartTimeMs = null;
-    _timeoutReached = false;
-    _setCompletionLogged = false;
+    _restStartMs = null;
+    _reArmHoldStartMs = null;
+    _completedHoldingTimeMs = 0;
+    _outerBreakFaultId = null;
     _holdSeconds.reset();
     _diagnosticLog.clear();
     _lastDiagnosticTime = 0;
     repCount = 0;
     correctForm = true;
-    lastHoldFaultVoiceMessage = null;
     logger.clear();
     timerMetric.reset();
     _holdingDebouncer.reset();
@@ -440,56 +559,82 @@ class HighPlank extends ExerciseBase {
     }
   }
 
-  void _updateStateMachine(double bodyAngle, double armAngle, double hipDev,
-      double kneeAngle, int now) {
-    bool isFormGoodToHold =
-        bodyAngle >= HighPlankConfig.HOLDING_BODY_THRESHOLD &&
-            armAngle >= HighPlankConfig.HOLDING_ARM_THRESHOLD &&
-            kneeAngle >= HighPlankConfig.HOLDING_KNEE_THRESHOLD &&
-            hipDev < HighPlankConfig.HOLDING_SAG_DEVIATION;
-
-    bool isFormBadToDrop = bodyAngle < HighPlankConfig.DROPPING_PIKE_ANGLE ||
-        armAngle < HighPlankConfig.DROPPING_ARM_ANGLE ||
-        kneeAngle < HighPlankConfig.DROPPING_KNEE_ANGLE ||
-        hipDev >= HighPlankConfig.DROPPING_SAG_DEVIATION;
+  void _updateStateMachine(
+    double bodyAngle,
+    double armAngle,
+    double hipDev,
+    double kneeAngle,
+    double torsoTiltDeg,
+    int now,
+  ) {
+    final isInsideOuterEntry =
+        bodyAngle >= HighPlankConfig.OUTER_ENTRY_BODY_MIN &&
+            armAngle >= HighPlankConfig.OUTER_ENTRY_ARM_MIN &&
+            kneeAngle >= HighPlankConfig.OUTER_ENTRY_KNEE_MIN &&
+            hipDev < HighPlankConfig.OUTER_ENTRY_SAG_MAX &&
+            torsoTiltDeg <= HighPlankConfig.OUTER_ENTRY_TORSO_TILT_MAX;
+    final isOutsideOuterRing =
+        bodyAngle < HighPlankConfig.OUTER_EXIT_BODY_MIN ||
+            armAngle < HighPlankConfig.OUTER_EXIT_ARM_MIN ||
+            kneeAngle < HighPlankConfig.OUTER_EXIT_KNEE_MIN ||
+            hipDev >= HighPlankConfig.OUTER_EXIT_SAG_MAX ||
+            torsoTiltDeg > HighPlankConfig.OUTER_EXIT_TORSO_TILT_MAX;
+    final confirmedOuterPose = _holdingDebouncer.update(isInsideOuterEntry);
 
     if (state == HighPlankState.setup || state == HighPlankState.dropping) {
-      if (_holdingDebouncer.update(isFormGoodToHold)) {
-        lastHoldFaultVoiceMessage = null;
+      if (confirmedOuterPose) {
         _transitionState(HighPlankState.holding, now);
       }
     } else if (state == HighPlankState.holding) {
-      if (_droppingDebouncer.update(isFormBadToDrop)) {
-        lastHoldFaultVoiceMessage = _voiceForHoldBreak(
-          bodyAngle: bodyAngle,
-          armAngle: armAngle,
-          hipDev: hipDev,
-          kneeAngle: kneeAngle,
-        );
+      if (_droppingDebouncer.update(isOutsideOuterRing)) {
+        // Keep the structural clock-stop signal distinct from inner metric
+        // faults so same-fault-once does not suppress it after a coached sag.
+        _outerBreakFaultId = 'wall_guard';
         _transitionState(HighPlankState.dropping, now);
+      } else if (timerMetric.totalHoldingTimeMs >= _targetTimeMs) {
+        _transitionState(HighPlankState.resting, now);
+      }
+    } else if (state == HighPlankState.resting) {
+      _advanceRestOnClock(now);
+    } else if (state == HighPlankState.reArming) {
+      if (!confirmedOuterPose) {
+        _reArmHoldStartMs = null;
+      } else {
+        _reArmHoldStartMs ??= now;
+        if (now - _reArmHoldStartMs! >=
+            ExerciseBase.HOLD_STILL_REQUIRED_DURATION.inMilliseconds) {
+          _transitionState(HighPlankState.holding, now);
+        }
       }
     }
   }
 
-  String _voiceForHoldBreak({
-    required double bodyAngle,
-    required double armAngle,
-    required double hipDev,
-    required double kneeAngle,
-  }) {
-    if (hipDev >= HighPlankConfig.DROPPING_SAG_DEVIATION) {
-      return 'Siết chặt bụng, nâng hông lên một chút';
+  void _advanceRestOnClock(int now) {
+    final restStartedAt = _restStartMs;
+    if (state != HighPlankState.resting || restStartedAt == null) return;
+    final restSeconds = (now - restStartedAt) / 1000.0;
+    if (restSeconds >= HighPlankConfig.REST_DURATION_SECONDS) {
+      _transitionState(HighPlankState.reArming, now);
     }
-    if (armAngle < HighPlankConfig.DROPPING_ARM_ANGLE) {
-      return 'Duỗi thẳng cánh tay ra';
+  }
+
+  void _publishReArmGuidance() {
+    if (state != HighPlankState.reArming) return;
+    if (_reArmHoldStartMs == null) {
+      // Not yet posed: reuse set-start's "get into position" signage + its
+      // stuck-user voice re-tell.
+      publishGuidanceSignal(
+        const GuidanceSignal.setupPosition(
+          title: 'Vào vị trí',
+          body: 'Vào tư thế và giữ yên để bắt đầu.',
+        ),
+      );
+    } else {
+      // Once posed: clear the signage so re-arm is LINELESS (mirrors set-start's
+      // hold-still) and the _CenterOverlay activation countdown RING renders.
+      // A holdStill banner here would set guidanceCopy and suppress the ring.
+      clearGuidanceSignal();
     }
-    if (bodyAngle < HighPlankConfig.DROPPING_PIKE_ANGLE || hipDev < -0.05) {
-      return 'Hạ thấp mông xuống bằng với vai';
-    }
-    if (kneeAngle < HighPlankConfig.DROPPING_KNEE_ANGLE) {
-      return 'Duỗi thẳng cánh tay ra';
-    }
-    return 'Giữ người thẳng trên sàn';
   }
 
   void _transitionState(HighPlankState newState, int now) {
@@ -500,6 +645,103 @@ class HighPlank extends ExerciseBase {
     _droppingDebouncer.reset();
     for (var metric in _metrics)
       metric.onStateTransition(previousState, newState, now);
+
+    switch (newState) {
+      case HighPlankState.holding:
+        // A drop pauses the current hold. Setup/rest begin a fresh hold.
+        if (previousState != HighPlankState.dropping) {
+          timerMetric.resetForNextHold();
+        }
+        _restStartMs = null;
+        _reArmHoldStartMs = null;
+        _outerBreakFaultId = null;
+        _holdSeconds.resetTick();
+        break;
+      case HighPlankState.dropping:
+        timerMetric.pause();
+        _holdSeconds.resetTick();
+        break;
+      case HighPlankState.resting:
+        timerMetric.pause();
+        _holdSeconds.resetTick();
+        _restStartMs = now;
+        _reArmHoldStartMs = null;
+        _onHoldComplete();
+        break;
+      case HighPlankState.reArming:
+        timerMetric.pause();
+        _holdSeconds.resetTick();
+        _restStartMs = null;
+        _reArmHoldStartMs = null;
+        break;
+      case HighPlankState.setup:
+        timerMetric.resetForNextHold();
+        _restStartMs = null;
+        _reArmHoldStartMs = null;
+        _holdSeconds.resetTick();
+        break;
+    }
+  }
+
+  void _interruptActiveHold(String faultId) {
+    if (state != HighPlankState.holding) return;
+    _outerBreakFaultId = faultId;
+    _transitionState(HighPlankState.dropping, frameTimestampMs);
+  }
+
+  void _interruptReArm() {
+    if (state != HighPlankState.reArming) return;
+    _reArmHoldStartMs = null;
+    _holdingDebouncer.reset();
+  }
+
+  void _onHoldComplete() {
+    repCount += 1;
+    final measuredHoldTimeMs =
+        timerMetric.totalHoldingTimeMs.clamp(0, _targetTimeMs);
+    _completedHoldingTimeMs += measuredHoldTimeMs;
+
+    final faultsById = <String, FaultRecord>{
+      if (saggingMetric.faults.isNotEmpty)
+        'sagging': saggingMetric.faults.first,
+      if (elbowMetric.faults.isNotEmpty) 'elbow': elbowMetric.faults.first,
+      if (pikedHipMetric.faults.isNotEmpty)
+        'piked': pikedHipMetric.faults.first,
+    };
+    correctForm = !faultsById.values.any((fault) => fault.affectsForm);
+
+    final faultMap = <String, Map<String, String>>{
+      if (faultsById.isNotEmpty)
+        'HOLDING': <String, String>{
+          for (final entry in faultsById.entries)
+            entry.key: entry.value.message,
+        },
+    };
+    setFeedback.add({correctForm: faultMap});
+    logger.addRepLog(
+      RepLog(
+        correctForm: correctForm,
+        repNumber: repCount,
+        data: {
+          'hold_time': measuredHoldTimeMs / 1000.0,
+          'fault_types': faultsById.keys.toList(),
+          'fault_affects_form': <String, bool>{
+            for (final entry in faultsById.entries)
+              entry.key: entry.value.affectsForm,
+          },
+          'fault_priorities': const <String, int>{
+            'sagging': 0,
+            'elbow': 1,
+            'piked': 2,
+          },
+        },
+      ),
+    );
+
+    for (final metric in _metrics) {
+      if (!identical(metric, timerMetric)) metric.resetAndCountFault();
+    }
+    correctForm = true;
   }
 
   double _interpolateY(PoseLandmark p1, PoseLandmark p2, double targetX) {

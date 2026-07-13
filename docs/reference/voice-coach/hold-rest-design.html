@@ -1,0 +1,500 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inter-hold rest · DECIDED v4 · Vika</title>
+<style>
+:root{
+  --ink:#1F1812; --ink-soft:#4A4031; --muted:#8a7c63;
+  --page:#F1E9D9; --raised:#FBF7EE; --line:#E4DAC5; --line-soft:#EEE6D5;
+  --yellow:#FFB701;
+  --code-bg:#211A12; --code-fg:#EDE3CE; --code-dim:#9A8C71; --code-rule:#37291a;
+  --tip:#2E6E63; --tip-bg:#E9F1EE; --tip-line:#BFDBD3;
+  --warn:#A2472B; --warn-bg:#F7EAE2; --warn-line:#E7C6B6;
+  --idea:#8A6608; --idea-bg:#FBF0D6; --idea-line:#EBD69E;
+  --fork:#5B4B86; --fork-bg:#EEEAF5; --fork-line:#CFC4E4;
+  --mono:"JetBrains Mono","SF Mono",Menlo,Consolas,monospace;
+  --sans:"Be Vietnam Pro",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--ink);font-family:var(--sans);line-height:1.62;font-size:16px;-webkit-font-smoothing:antialiased}
+code{font-family:var(--mono);overflow-wrap:anywhere;font-size:.92em}
+h1,h2,h3{line-height:1.18;font-weight:800;letter-spacing:-.01em}
+header.hero{padding:56px 28px 40px;background:radial-gradient(120% 140% at 12% 0%,#2b2117 0%,#1c150e 60%,#160f09 100%);color:#F3ECDD}
+.hero-in{max-width:900px;margin:0 auto}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.24em;text-transform:uppercase;color:var(--yellow);margin:0 0 14px}
+header.hero h1{font-size:clamp(28px,5vw,44px);margin:0 0 14px;color:#FBF7EE}
+header.hero h1 .u{background:linear-gradient(transparent 68%,rgba(255,183,1,.42) 0);padding:0 2px}
+header.hero p.lede{font-size:17px;max-width:74ch;color:#D9CFBD;margin:0 0 26px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font-family:var(--mono);font-size:12px;padding:6px 11px;border-radius:999px;border:1px solid rgba(255,255,255,.16);color:#E8DFCD;background:rgba(255,255,255,.04)}
+.chip b{color:var(--yellow);font-weight:600}
+main{max-width:900px;margin:0 auto;padding:8px 28px 120px}
+section{padding:30px 0;border-top:1px solid var(--line)}
+section:first-of-type{border-top:0}
+.kicker{font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 6px}
+h2{font-size:24px;margin:0 0 14px}
+h3{font-size:17px;margin:22px 0 8px}
+p{margin:10px 0;max-width:78ch}
+table{border-collapse:collapse;width:100%;margin:14px 0;font-size:14px;background:var(--raised)}
+th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+th{font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;background:var(--line-soft)}
+.code{margin:16px 0;border-radius:10px;overflow:hidden;border:1px solid var(--code-rule)}
+.code-head{font-family:var(--mono);font-size:12px;color:var(--code-dim);background:#191209;padding:8px 14px;border-bottom:1px solid var(--code-rule)}
+.code-body{background:var(--code-bg);color:var(--code-fg);padding:14px 16px;overflow-x:auto}
+.code-body pre{margin:0;font-family:var(--mono);font-size:13px;line-height:1.55}
+.call{border-radius:10px;padding:12px 16px;margin:16px 0;font-size:14.5px;border:1px solid}
+.call b.t{display:block;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px}
+.call.tip{background:var(--tip-bg);border-color:var(--tip-line)} .call.tip b.t{color:var(--tip)}
+.call.warn{background:var(--warn-bg);border-color:var(--warn-line)} .call.warn b.t{color:var(--warn)}
+.call.idea{background:var(--idea-bg);border-color:var(--idea-line)} .call.idea b.t{color:var(--idea)}
+.fork{border-radius:10px;padding:14px 18px;margin:20px 0;border:1px solid var(--fork-line);background:var(--fork-bg)}
+.fork b.t{display:block;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px;color:var(--fork)}
+.tl{list-style:none;margin:20px 0;padding:0;border-left:3px solid var(--yellow)}
+.tl li{position:relative;margin:0;padding:10px 0 10px 22px}
+.tl li::before{content:"";position:absolute;left:-8px;top:18px;width:13px;height:13px;border-radius:50%;background:var(--raised);border:3px solid var(--yellow)}
+.tl li.mute::before{border-color:var(--line)}
+.tl .when{font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);display:block}
+.tl .what{font-size:15px}
+.tl .chan{font-family:var(--mono);font-size:11px;color:var(--fork);background:var(--fork-bg);border:1px solid var(--fork-line);border-radius:999px;padding:1px 8px;margin-left:6px;white-space:nowrap}
+.gl{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:20px 0}
+.gl>div{background:var(--raised);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:14px}
+.gl b{display:block;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px}
+.vn{font-style:italic}
+ul{max-width:78ch}
+li{margin:6px 0}
+</style>
+</head>
+<body>
+<header class="hero"><div class="hero-in">
+  <p class="eyebrow">Voice coach · DECIDED v4 + AS BUILT (07-12, uncommitted) — ruled by Nam (lavish 07-12); implemented by Codex same day, code-synced · was PROPOSAL v1</p>
+  <h1>Inter-hold rest: <span class="u">every hold re-earns its start</span></h1>
+  <p class="lede">Nam's ruling re-shaped the proposal's quiet rest into a <b>full re-activation
+  ritual</b>: rest timer completes → rest-end tone → ring flips to "Vào tư thế" → pose confirm →
+  the same "ba, hai, một" countdown as exercise start → only then does the next hold's clock run.
+  His why: <b>the hold timer must never run while the user isn't actually in the exercise.</b> Plus a
+  third UI modality — HYBRID — where the time rings and the rep-tracking UI render together.
+  <b>[SUPERSEDED — see the banner above]</b> v4 had ruled the re-arm phase VOICE-SILENT (ring-only,
+  the v3 <code>setup_position</code> reuse dropped); the 07-12 device-tune REVERSED that — the re-arm
+  now reuses set-start's <code>setup_position</code> UI <i>and</i> voice (delayed stuck-user re-tell,
+  silent on clean re-arms). The v4 wording in this paragraph and below is kept as history. Decision
+  record: decisions.md "2026-07-12 · Inter-hold rest RULED" (v4) then "2026-07-12 · High Plank
+  device-tune" (#3/#4, the reversal).
+  <b>AS BUILT (07-12, uncommitted):</b> the addendum spec is IMPLEMENTED in the working tree
+  (analyze clean, 74 focused tests green); this doc mirrors the code, with AS BUILT markers where
+  the mechanism differs from the decided-design wording (hybrid = flags not enum; safety-voice
+  clarification; intro-termination structurally set-start-only).</p>
+  <div class="chips">
+    <span class="chip">status <b>DECIDED + AS BUILT — uncommitted, Nam review pending</b></span>
+    <span class="chip">centerpiece <b>re-activation ritual, every hold</b></span>
+    <span class="chip">re-arm voice <b>REUSES set-start setup_position (delayed stuck re-tell) — v4 SILENT reversed 07-12</b></span>
+    <span class="chip">re-arm grace <b>NONE — verified in code</b></span>
+    <span class="chip">modalities <b>time · rep · HYBRID (flags, as built)</b></span>
+    <span class="chip">new recordings <b>ZERO</b></span>
+  </div>
+</div></header>
+<main>
+
+<div class="call warn" style="margin:24px 0 4px;border-width:2px">
+<b class="t">⚠ SUPERSEDED — re-arm voice-silent is REVERSED (2026-07-12 device-tune, Nam)</b>
+<p style="margin:6px 0 8px"><b>The v4 "re-arm phase is VOICE-SILENT" ruling throughout this doc is
+GONE.</b> After the first on-device pass, Nam ruled the re-arm must <b>reuse set-start's
+<code>setup_position</code> machinery WHOLE — UI <i>and its voice</i></b>: a stuck user at re-arm gets
+the same "get into position" prompt + voice they'd get at set-start, while a clean per-hold re-arm
+stays silent. This works precisely because the setup_position voice is a <b>delayed stuck-user
+re-tell</b> (~10s, signal-driven via <code>_SetupSafetyVoiceController</code>), so it fires only when
+the user actually needs it — no per-hold spam. That anti-spam property is why "reuse the machinery" is
+the answer, not a new line and not the immediate intro.</p>
+<p style="margin:0"><b>Read the v4 sections below as HISTORY.</b> Everywhere this doc says the re-arm is
+voice-silent / the <code>setup_position</code> reuse is superseded / there is "NO voice backstop"
+(§00 lede, §04-C stuck-user, §04-D grace, §05/§06 tables, the "re-arm voice SILENT" chip), that call
+is itself now superseded. The mechanics it documents — the clock-follower countdown re-arm, the
+<code>reArming</code> state, the ring/tone — all still stand; only the <b>voice-silent</b> constraint
+flipped. Current AS-BUILT-INTENT: <code>docs/decisions.md</code> "2026-07-12 · High Plank device-tune"
+(#3/#4) + <code>hold-pilot-device-tune-design.html</code> Fix 3. Grace: the reversal is about VOICE,
+not grace; the "no guidance grace mid-set" note may still hold (the re-tell floors on the
+already-stamped intro-audio-end), flagged for device verification in the new design.</p>
+</div>
+
+<section>
+  <p class="kicker">01 · Reframe (v1 finding, stands)</p>
+  <h2>Two premises the code inverted — still the ground this stands on</h2>
+  <ul>
+    <li><b>The rest ring is built and wired, not missing.</b> <code>RestCountdownRing</code>
+      (<code>lib/screens/exercise/widgets/rest_countdown_ring.dart:22</code>) — amber drain +
+      countdown numeral — already crossfades with the yellow work ring in the centre slot
+      (<code>active_exercise_page.dart:2182–2211</code>). Forearm Plank lights it every rest. It is
+      dark on High Plank only because pre-migration High Plank has no <code>resting</code> state.</li>
+    <li><b>The exercise screen is Premium Ivory (<code>VikaIvory</code>,
+      <code>lib/theme/vf_theme.dart:416</code>), not legacy jade <code>VFTheme</code>.</b> Every ring
+      and hero widget below pulls from VikaIvory. (CLAUDE.md Part 2 is stale on this.)</li>
+  </ul>
+  <p>So the UI work remains protective-plus-composition: keep the rings alive through the migration
+  (the <code>isTimeBased</code> fence), type the rest channel (U2), and — new in the ruling — compose
+  the hybrid modality (§05).</p>
+</section>
+
+<section>
+  <p class="kicker">02 · Ground truth</p>
+  <h2>The machinery the ritual re-arms — verified in code</h2>
+  <p>Nam: the re-entry should work "just like how they got in at the beginning." That is not a
+  metaphor — both halves of the set-start activation are <b>clock-followers</b> that can be re-armed
+  per hold with almost no new machinery:</p>
+  <h3>Voice half — the countdown is a self-contained clock-follower</h3>
+  <div class="code"><div class="code-head">lib/voice/policy_voice_coach.dart:434–443 (condensed, verbatim core)</div>
+  <div class="code-body"><pre>void _handleActivationCountdown(ExerciseBase exercise) {
+  final holdMs = exercise.holdStillElapsedMs;               // the 3s hold clock
+  final holding =
+      holdMs != null && exercise.exerciseState == ExerciseState.notActivated;
+  if (holding) {
+    for (var i = 0; i < kActivationCountOffsetsMs.length; i++) {   // 800/1600/2400ms
+      if (_countdownSpoken.contains(i)) continue;
+      if (holdMs >= kActivationCountOffsetsMs[i]) { … speak "ba/hai/một" … }</pre></div></div>
+  <p>Break semantics are already right for the ritual: a broken hold drops the perishable pending
+  counts and re-arms from "ba"; commit keeps the queue so a mid-play "một"
+  survives as the go cue. The <b>only</b> thing binding this to set-start was the
+  <code>exerciseState == notActivated</code> term and the fact that
+  <code>holdStillElapsedMs</code> (keyed off <code>_holdStillStartedAt</code>) only ran
+  pre-activation.</p>
+  <div class="call tip"><b class="t">AS BUILT — the gate widened exactly here</b>
+  The handler now computes <code>inActivationContext = notActivated || exercise.isReArmingHold</code>
+  (<code>policy_voice_coach.dart:439–442</code>); <code>ExerciseBase.isReArmingHold</code> defaults
+  false (<code>exercise_base.dart:401</code>) and High Plank overrides it plus BOTH clock getters —
+  <code>holdStillElapsedMs</code> / <code>activationProgress</code> return the re-arm clock while
+  re-arming (<code>high_plank.dart:124–140</code>, the addendum's recommended
+  widened-getters shape; Codex chose subclass overrides over parallel getters). Break semantics
+  carried over verbatim: pose loss in re-arm nulls the clock → <code>clearPending()</code> →
+  restart from "ba"; the commit keeps the queue.</div>
+  <h3>UI half — the activation gauge follows the same clock</h3>
+  <div class="code"><div class="code-head">active_exercise_page.dart:2142 + 2900–2910 (the gauge's input and label)</div>
+  <div class="code-body"><pre>progress: widget.exercise.activationProgress,   // _LiveOverlayState.hold branch
+…
+final remainingSeconds =
+    (ExerciseBase.HOLD_STILL_REQUIRED_DURATION.inMilliseconds * (1 - clamped)) / 1000;
+final isReadyToStart = remainingSeconds <= 0;
+final remainingLabel = isReadyToStart ? 'Sẵn sàng' : …ceil().toString();</pre></div></div>
+  <p>Yellow ring, breathing halo, centred remaining-seconds numeral, "Sẵn sàng/Bắt đầu" at ready —
+  the exact visual Nam wants back per hold. It renders when <code>_overlayState</code>
+  resolves to <code>hold</code> — <b>AS BUILT: that resolution is widened</b> — an
+  <code>activated</code> exercise with <code>isReArmingHold && activationProgress != null</code> now
+  also resolves to <code>hold</code> (<code>active_exercise_page.dart:2472–2476</code>), so the
+  set-start gauge renders per hold with zero widget changes.</p>
+  <h3>The rest producer and its re-entry gate (plank.dart, the migration template)</h3>
+  <div class="code"><div class="code-head">lib/exercise/plank/plank.dart:343–350 (verbatim) — what the ritual replaces</div>
+  <div class="code-body"><pre>case PlankState.resting:
+  if (_restStartMs != null) {
+    final restElapsed = (timestampMs - _restStartMs!) / 1000.0;
+    if (restElapsed >= PlankConfig.REST_DURATION && confirmedPlank) {
+      _transitionState(PlankState.holding, timestampMs);
+    }
+  }
+  break;</pre></div></div>
+  <p>Plank's re-entry = time + a 2-frame pose debounce, in one condition. <b>AS BUILT, High Plank
+  split it into two states:</b> <code>resting</code> is STRICTLY timed (pose-independent —
+  <code>restSeconds >= REST_DURATION_SECONDS</code> is the whole exit,
+  <code>high_plank.dart:547–551</code>) and hands to a new <code>reArming</code> state that runs the
+  full ritual (§03/§04-D). Forearm Plank itself is untouched (fenced).</p>
+  <h3>Rep-tracking UI (needed for hybrid, §05)</h3>
+  <div class="code"><div class="code-head">the rep hero — pre-build gate `!isTimeBased`; AS BUILT it gates on `showsRepTracking` (:62, :2160, :2266)</div>
+  <div class="code-body"><pre>// pre-build:  if (!widget.isTimeBased && activeState && …) IvoryRepHero(…)
+// AS BUILT:   bool get showsRepTracking => showRepTracking ?? !isTimeBased;   // :62
+//             if (widget.showsRepTracking && …) IvoryRepHero(repCount, totalReps)
+// landscape: right edge · portrait: bottom band — positions unchanged</pre></div></div>
+  <p><b>ELI5:</b> the app already owns every piece the ruling asks for — a 3-2-1 voice countdown that
+  watches a clock, a yellow gauge that watches the same clock, an amber rest ring, and a rep counter
+  widget. Set-start wired them to "the first time you get into position." The ritual is re-arming
+  those exact pieces at every rest's end, and hybrid is un-hiding the rep counter that time-based
+  mode currently switches off.</p>
+</section>
+
+<section>
+  <p class="kicker">03 · The centerpiece</p>
+  <h2>The re-activation ritual — one full rest cycle</h2>
+  <p>Timeline of one breather (High Plank, rest constant R = 5s, re-arm hold = the same 3s
+  <code>HOLD_STILL_REQUIRED_DURATION</code> as set start):</p>
+  <ol class="tl">
+    <li><span class="when">t = 0 · hold N completes (holding → resting)</span>
+      <span class="what">"Hai!" numeral <span class="chan">voice FIFO</span> + hold-end tone
+      <span class="chan">earcon ∥</span> — locked round-2 behaviour, unchanged. Amber
+      <code>RestCountdownRing</code> crossfades in and drains (typed <code>liveRestSeconds</code>
+      drives it, U2 as built). <b>No rest-start voice (V1).</b> AS BUILT: entering
+      <code>resting</code> also clears the countdown trackers (<code>_countdownSpoken</code> +
+      <code>_holdCountingActive</code>, <code>policy_voice_coach.dart:509–512</code>) so every
+      breather earns a fresh "ba, hai, một".</span></li>
+    <li class="mute"><span class="when">t = 0 → R · the breather (STRICTLY timed, as built)</span>
+      <span class="what">Silence. Ring drains, numeral counts down. The rest state is
+      pose-INDEPENDENT — its only exit is the 5s elapsing (<code>high_plank.dart:547–551</code>) —
+      so the rest countdown is honest by construction. No predictive spoken countdown
+      (confirmed).</span></li>
+    <li><span class="when">t = R · rest timer completes (resting → reArming, the timed edge)</span>
+      <span class="what"><b>Rest-end tone</b> <span class="chan">earcon ∥</span> fires deterministically
+      on the <code>enteredReArming</code> edge (<code>EarconPlayer.restEndTone()</code>,
+      <code>policy_voice_coach.dart:513–515</code>; asset
+      <code>assets/audio/common/rest_end_tone.mp3</code>). Ring is drained; its centre flips to
+      <span class="vn">"Vào tư thế"</span> — as built, <code>RestCountdownRing</code> grew a
+      <code>centerLabel</code> that the page sets while re-arming
+      (<code>active_exercise_page.dart:2207–2212</code>). <b>No instruction voice — the ring IS the
+      instruction channel (v4).</b> A user already back in the pose flows straight into the
+      countdown (the 4-frame pose debounce simply confirms immediately).</span></li>
+    <li class="mute"><span class="when">t = R → pose · reArming, pose not yet confirmed</span>
+      <span class="what">Screen shows "Vào tư thế"; <b>no coaching/instruction voice (v4)</b> — no
+      re-tell. AS BUILT clarification: <b>safety guidance CAN still speak here, ungraced</b>
+      (out-of-frame, orientation, etc. — "voice-silent" never meant deaf safety); a stuck-but-present,
+      in-frame user hears nothing by accepted-risk ruling — device watch item (§04-C). Pose confirm =
+      the existing 4-frame outer-pose debounce (<code>high_plank.dart:88</code>, <code>:552–556</code>);
+      pose loss, bad pose, orientation loss, or missing landmarks resets the re-arm clock.</span></li>
+    <li><span class="when">pose confirmed · re-arm hold starts</span>
+      <span class="what">The 3s activation-hold clock runs again (<code>_reArmHoldStartMs</code>,
+      surfaced through the overridden <code>holdStillElapsedMs</code>/<code>activationProgress</code>).
+      UI: the SAME yellow activation gauge (remaining-seconds numeral, "Sẵn sàng" at ready) via the
+      widened <code>_overlayState</code>. Voice: the SAME <code>_handleActivationCountdown</code>
+      speaks <b>"ba"</b> (800ms) → <b>"hai"</b> (1600ms) → <b>"một"</b> (2400ms)
+      <span class="chan">voice FIFO</span> via the widened <code>inActivationContext</code> — the
+      first coaching voice since the hold-count numeral at rest start. A pose break nulls the clock,
+      drops pending counts, and re-arms from "ba" (existing perishability, verified).</span></li>
+    <li><span class="when">re-arm hold lands (3s) · reArming → holding commit</span>
+      <span class="what">Hold N+1's clock starts — <b>only now</b>: the commit runs
+      <code>timerMetric.resetForNextHold()</code> for a fresh hold
+      (<code>high_plank.dart:577–583</code>; a mid-hold drop still pause-resumes — only setup/rest
+      begin fresh). The <b>reminder</b> ("Lần này bạn nhớ…"), if earned by a fault in hold N, fires
+      at this commit edge — its locked ruling verbatim — and queues right behind "một"
+      <span class="chan">voice FIFO</span> (§04-A). Work ring crossfades back in.</span></li>
+    <li class="mute"><span class="when">t = T/2, T−10, T−5…T−1, T · inside hold N+1</span>
+      <span class="what">Milestones, spoken final countdown, hold-end tone — all locked round-2
+      behaviour, untouched. First possible milestone (halfway) sits ≥7s after the reminder on a 15s+
+      hold — no congestion.</span></li>
+  </ol>
+  <div class="call tip"><b class="t">The design principle that makes it clean</b>
+  The ritual is <b>a re-arm, not a copy.</b> Both set-start halves are clock-followers: voice follows
+  <code>holdStillElapsedMs</code>, UI follows <code>activationProgress</code>. The re-entry exposes the
+  SAME clock surfaces during a new re-arm phase, and both followers light up with their trained
+  behaviour — offsets, perishability, gauge visuals — with no parallel implementation (the
+  intro-termination rule stays set-start-only; nothing plays at re-arm for a count to cut). Zero
+  new grammar for the user (Nam's why: "just like how they got in at the beginning"), near-zero new
+  machinery for the code — and under v4, what re-arms is the clock-follower ONLY, never the grace
+  anchors around it (§04-D).</div>
+  <div class="call warn"><b class="t">Cost flag for device (feel-tune, not a blocker)</b>
+  The ritual stretches the effective inter-hold gap: R (5s) + pose re-entry time + 3s re-arm ≈ 8s+
+  between holds vs plank's flat 5s today (v4 trimmed the estimate's upper end — no instruction line
+  plays, so the only variable is how fast the user re-poses). Physiologically fine (it is still a
+  breather), but the McGill-style short-rest intent behind plank's 5s constant gets diluted. If
+  device feel says the cycle drags, the knob is <code>REST_DURATION</code> per exercise (e.g. 3s),
+  NOT thinning the ritual — the ritual is the ruled invariant.</div>
+</section>
+
+<section>
+  <p class="kicker">04 · Reconciliations</p>
+  <h2>The five overlaps, made clean</h2>
+
+  <div class="fork"><b class="t">A · Where the reminder sits in the ritual</b>
+  <p style="margin-top:0">The locked commit edge ("hold N+1's re-entry into <code>holding</code>")
+  survives the ritual <b>unchanged</b> — re-entry into holding now happens when the re-arm hold lands,
+  so the reminder fires there and FIFO-queues behind "một", landing in the hold's first ~1–2s.
+  Under v4 this is also the ONLY possible voice slot in the ritual (the re-arm is voice-silent), and
+  it is the right one anyway: feedforward research (§3b) wants the cue adjacent to the action it
+  fixes, and the commit edge is the action starting. Collision math: "một" is ~0.4s, the reminder
+  ~1.5s, the first milestone ≥7s away on any hold long enough to have one. Clean — and the reminder
+  is now the only line that can play between the rest-end tone and the next milestone.</p></div>
+
+  <div class="fork"><b class="t">B · Rest-end tone asset — RESOLVED: sibling landed</b>
+  <p style="margin-top:0"><b>Nam confirmed the sibling pick; the asset EXISTS:</b>
+  <code>assets/audio/common/rest_end_tone.mp3</code> (candidate_192761, 1.0s bell ding, CC0
+  freesound.org/s/192761). The reasoning that drove it, kept for the record: two identical bells ~5s
+  apart would make one sound mean two opposite states — "you're done, rest" and "rest's done, work" —
+  un-training the round-2 rule that sounds carry state. Registers now differ the way the states do:
+  hold-end = the boxing bell's "time!" release (157277, 2.7s ring-out); rest-end = a short bright
+  ding that reads "bell for round 2" (and under v4 it stands alone — no line follows it). It is an
+  <code>EarconPlayer</code> sound like the end tone (direct path, never in <code>commonFiles</code>);
+  Codex adds no files.</p></div>
+
+  <div class="fork"><b class="t">C · Stuck user — RE-RULED v4: no voice backstop at all</b>
+  <p style="margin-top:0"><b>The rest-end tone + the persistent "Vào tư thế" ring ARE the nudge —
+  and the ONLY nudge.</b> The v3 instruction line and its ~10s voice re-tell are both dead (Nam:
+  the set intro already taught the pose; zero coaching voice between tone and countdown). A
+  stuck-but-present user sees the ring indefinitely and hears nothing — <b>accepted risk, device
+  watch item</b>: this is the one place the design tolerates a silent screen-dependent state for a
+  floor-bound user, by explicit ruling. <b>AS BUILT clarification (accepted): "voice-silent" scopes
+  to instruction/coaching voice only — SAFETY guidance still speaks during re-arm, ungraced</b>
+  (a user who drifts out of frame or loses orientation mid-rest gets the normal guidance line; the
+  implementation resolved the spec's wording tension in favor of safety). The presence gate still
+  owns walk-away; quit still owns give-up. No new keys (<code>common.rest_over</code> and
+  <code>common.hold_reengage</code> both dead).</p>
+  <p><b>Shared-key note (v4 — mostly dissolved):</b> <code>&lt;slug&gt;.setup_position</code> keeps
+  exactly its two existing <code>notActivated</code> moments — the set-start intro broadcast and the
+  set-start stuck-user re-tell. <b>Nothing in the ritual fires it.</b> The v3 four-moment
+  coexistence design is superseded; the only residual instruction to Codex is negative: do not wire
+  any <code>setup_position</code> (or other) voice into the re-arm phase, and verify the
+  <code>GuidanceClass.setupPosition</code> producer stays quiet while <code>activated</code> (it
+  should already — it is a pre-activation mechanism).</p></div>
+
+  <div class="fork"><b class="t">D · The state-machine gate (same machinery, not a parallel copy) — and NO grace import</b>
+  <p style="margin-top:0">The <code>resting → holding</code> transition becomes a two-stage gate:
+  <b>stage 1 (timed)</b> — <code>restElapsed >= REST_DURATION</code> flips resting into a
+  <b>re-arm phase</b> (this timed flip is the tone + U3 edge); <b>stage 2 (ritual)</b> —
+  in re-arm, the exercise runs the SAME pose-confirm + 3s hold-clock pattern as base activation and
+  only commits to <code>holding</code> when the clock lands. <b>AS BUILT exactly this shape:</b>
+  <code>HighPlankState.reArming</code> is a real state; High Plank overrides
+  <code>isReArmingHold</code> + the two clock getters (<code>high_plank.dart:124–140</code> —
+  Codex resolved the PUSH BACK toward widened getters, not parallel ones); the adapter gate is
+  <code>inActivationContext = notActivated || isReArmingHold</code>
+  (<code>policy_voice_coach.dart:439–442</code>) and the UI's <code>_overlayState</code> resolves
+  re-arm-with-progress to <code>hold</code> (<code>active_exercise_page.dart:2472–2476</code>).
+  Base state stays <code>activated</code> throughout — the setup intro, guidance latches, and
+  set-level one-shots correctly do NOT re-fire; only the countdown re-arms per hold, BY DESIGN.
+  <b>AS BUILT hardening (Codex, test-proven):</b> the intro-termination branch gained a structural
+  <code>exerciseState == notActivated</code> guard (<code>:456–459</code>) — a test showed
+  <code>_introAudioEnded</code> CAN still be false at the first re-arm, and without the guard a
+  re-arm count would have killed intro grace bookkeeping. Set-start behaviour unchanged.</p>
+  <p><b>NO guidance grace during re-arm (explicit v4 ruling) — VERIFIED IN CODE:</b> the grace
+  re-pin is explicitly excluded from rest and re-arm
+  (<code>policy_voice_coach.dart:236–240</code>: the pin condition carries
+  <code>currentPhaseKey != 'resting' && !exercise.isReArmingHold</code>), so guidance signals
+  (body_in_frame, turnSide, etc.) run UNGRACED through rest and re-arm, exactly as during holds.
+  Set-START grace behaviour is unchanged — and the intro-termination guard above is part of the same
+  protection (a re-arm count can no longer close intro grace on set-start's behalf).</p></div>
+
+  <div class="fork"><b class="t">E · U3 + V2 are one designed moment (screen + audio twins)</b>
+  <p style="margin-top:0">One moment, two renderers, one truth — the GuidanceSignal pattern. At the
+  timed edge the state flips to re-arm, and BOTH channels render that flip: audio = the rest-end
+  tone, <b>alone (v4 — sounds carry state; words stay out of the rest)</b>; screen = the drained
+  ring's centre swaps its "0" for <span class="vn">"Vào tư thế"</span> (setup-style label, VikaIvory
+  amber, matching the ring) — <b>the visual is the ONLY instruction channel at this edge.</b> When
+  the pose confirms, the screen hands off to the activation gauge (remaining-seconds → "Sẵn sàng"),
+  audio to "ba, hai, một" — both reading the same clock. Copy (final): screen
+  <span class="vn">"Vào tư thế"</span> stands as ruled (U3); there is no voice copy — nothing to
+  record or confirm. <b>AS BUILT:</b> <code>RestCountdownRing</code> gained a <code>centerLabel</code>
+  parameter (the page passes it while re-arming, <code>active_exercise_page.dart:2207–2212</code>);
+  once the re-arm clock runs (<code>reArmProgress != null</code>) the centre slot yields to the
+  gauge (<code>:2188–2191</code> exclusion + the widened <code>_overlayState</code>).</p></div>
+</section>
+
+<section>
+  <p class="kicker">05 · Hybrid modality (U1 expanded)</p>
+  <h2>Three modalities — and hybrid is un-hiding, not building</h2>
+  <p>Ruled: former hold-based homework exercises become <b>HYBRID</b> — the time/hold rings AND the
+  rep-tracking UI render together ("hybrid also needs to keep track of the reps — the same UI of
+  checking reps needs to be there as well"). Today the two surfaces are <b>mutually exclusive on one
+  boolean</b>:</p>
+  <table>
+    <tr><th>surface</th><th>widget</th><th>today's gate</th><th>hybrid</th></tr>
+    <tr><td>hold/rest rings (centre)</td><td><code>HoldHeroRing</code> / <code>RestCountdownRing</code></td><td><code>widget.isTimeBased == true</code> (<code>:2182</code>)</td><td>render</td></tr>
+    <tr><td>rep tracker (bottom / right edge)</td><td><code>IvoryRepHero(repCount, totalReps)</code></td><td><code>!widget.isTimeBased</code> (<code>:2256</code>)</td><td>render — <code>repCount</code> = completed holds, <code>totalReps</code> = <code>maxHolds</code></td></tr>
+  </table>
+  <p><b>Composition — AS BUILT with orthogonal flags, not the proposed enum (accepted):</b> the
+  design doc proposed <code>ExerciseModality { reps, time, hybrid }</code>; Codex implemented the
+  smaller shape — <code>isTimeBased</code> untouched, plus an opt-in <code>showRepTracking</code>
+  whose default preserves today's exclusivity:
+  <code>showsRepTracking => showRepTracking ?? !isTimeBased</code>
+  (<code>active_exercise_page.dart:47–62</code>). The spec carries <code>hybrid: true</code> +
+  <code>repHeroTarget: holdCount</code> (High Plank branch,
+  <code>exercise_experience_screen.dart:1149–1150</code>), threaded as
+  <code>showRepTracking: _spec.hybrid ? true : null</code> and
+  <code>totalReps: _spec.repHeroTarget ?? …</code> (<code>:851–853</code>); the rep hero gates on
+  <code>widget.showsRepTracking</code> (<code>:2160</code>, <code>:2266</code>). Same semantics as
+  the enum (rings = time truth, hero = rep truth, hybrid = both), one fewer type, and every
+  non-hybrid exercise byte-identical by the null default. Layout composes without collision as
+  predicted: rings own the centre; the hero owns the bottom band (portrait) / right edge
+  (landscape). <code>repCount</code> is the completed-hold counter, so the hero is data-honest with
+  zero adaptation.</p>
+  <div class="call tip"><b class="t">Why the v1 fence survives intact</b>
+  The v1 "pin <code>isTimeBased</code> true, decouple from <code>countsByRepNumber</code>" fence was
+  the two-flag split waiting to be named — and the as-built shape IS two orthogonal flags: UI time
+  modality is its own truth (<code>isTimeBased</code>, still true for High Plank), rep-tracking
+  visibility is its own truth (<code>showRepTracking</code>), and the volume resolution feeds both
+  without either clobbering the other. Had <code>isTimeBased</code> stayed the single gate, hybrid
+  would be unrepresentable.</div>
+  <ul>
+    <li><b>Which exercises:</b> pilot = High Plank (hybrid). Forearm Plank / Cobra / Warrior One are
+      already plank-model and become hybrid <i>when touched</i> — out of this pilot's scope (plank is
+      a read-only fence). Pure time (e.g. a future continuous stretch) keeps rings-only; the rep
+      fleet keeps hero-only. Nothing else moves.</li>
+    <li><b>Small OPEN (flag, don't block):</b> the pre-exercise spec label
+      (<code>targetLabel: isHold ? 'GIÂY/HIỆP' : 'REP/HIỆP'</code>,
+      <code>exercise_experience_screen.dart:1174</code>) has no hybrid form ("3 lần × 30 giây"-style).
+      Cosmetic; the addendum spec flags it for a copy decision at implementation.</li>
+  </ul>
+</section>
+
+<section>
+  <p class="kicker">06 · Fork history</p>
+  <h2>The v1 forks, each with Nam's ruling</h2>
+  <table>
+    <tr><th>#</th><th>fork (v1)</th><th>proposed</th><th>RULED (Nam, 07-12)</th></tr>
+    <tr><td>V1</td><td>rest START voice</td><td>nothing — screen-only</td><td><b>AS PROPOSED.</b> The numeral + hold-end tone own the moment.</td></tr>
+    <tr><td>V2</td><td>clean re-entry cue</td><td>nothing</td><td><b>RE-SHAPED → the ritual</b>, then <b>REFINED v4 voice-silent</b>: timed rest edge → rest-end tone → ring "Vào tư thế" (visual only; the v3 instruction-line reuse is superseded) → pose confirm → "ba, hai, một" → clock starts (§03). Not the rejected every-hold metronome: it narrates STRUCTURE at a causal edge (principle 3), the exact class the set-start countdown lives in.</td></tr>
+    <tr><td>V3</td><td>overrun backstop line</td><td>one <code>hold_reengage</code> nudge</td><td><b>FOLDED INTO V2, then v4: NO voice backstop at all.</b> Tone + persistent ring are the only nudge; ring + presence gate are the backstops (accepted risk, device watch — §04-C). <code>common.hold_reengage</code> dropped.</td></tr>
+    <tr><td>—</td><td>predictive spoken rest countdown</td><td>no (data honesty)</td><td><b>CONFIRMED no.</b> The rest-end tone marks time-done; the timed edge makes the rest timer itself honest even though hold-entry stays pose-gated.</td></tr>
+    <tr><td>U1</td><td><code>isTimeBased</code> fence</td><td>pin true, decouple from count flag</td><td><b>STANDS + EXPANDED</b> to three modalities incl. HYBRID (§05). AS BUILT: orthogonal flags (<code>isTimeBased</code> untouched + <code>showRepTracking</code> opt-in), not the enum — accepted.</td></tr>
+    <tr><td>U2</td><td>rest ring plumbing</td><td>typed <code>liveRestSeconds</code> getters</td><td><b>APPROVED — option B, LANDED.</b> Typed values win in <code>_holdRestRemaining</code>; the 'Nghỉ' string parser is RETAINED as Forearm Plank's compatibility path (its parser also feeds the bottom-hold cue, so it could not be deleted).</td></tr>
+    <tr><td>U3</td><td>overrun visual</td><td>"Vào tư thế" at drained-0</td><td><b>APPROVED,</b> unified with V2's audio as one moment (§04-E). AS BUILT: <code>RestCountdownRing.centerLabel</code>, set while re-arming.</td></tr>
+  </table>
+</section>
+
+<section>
+  <p class="kicker">07 · Risks</p>
+  <h2>Lines most likely wrong + what to stress-test</h2>
+  <ul>
+    <li><b>Ritual pacing (softened by v4).</b> Tone → pose → 3s countdown, every hold, ~N times a
+      set. The v3 concern (a long intro-register line looping every breather) is MOOT — no line
+      plays. What's left to feel-check is only whether tone + 3s countdown per hold reads as
+      structure or as ceremony on short holds; if it drags, the knob is <code>REST_DURATION</code>
+      (§03 cost flag); do not cut ritual stages.</li>
+    <li><b>The gate-widening landed with a test-proven hardening (was the top code risk).</b>
+      The widened contexts are in (<code>inActivationContext</code>, widened
+      <code>_overlayState</code>), and Codex's test caught the exact set-start perturbation this
+      bullet feared: <code>_introAudioEnded</code> can still be false at the first re-arm, so the
+      intro-termination branch now carries a structural <code>notActivated</code> guard
+      (§04-D). Residual: device-confirm set-start feels identical (stress-test 6).</li>
+    <li><b>The silent stuck state is the accepted-risk watch item (unchanged by the build).</b> A
+      present-but-not-re-posing, in-frame user gets a persistent ring and zero audio — the one
+      deliberate exception to the "floor-bound users can't read the screen" doctrine (safety
+      guidance still covers out-of-frame/orientation, as built). Watch on device: if real users
+      stall in rest confused, the revisit is a ruling change, not a quiet fix.</li>
+    <li><b>Grace carry-over — VERIFIED excluded in code (§04-D), device check remains.</b> The
+      grace pin explicitly skips resting/re-arm (<code>policy_voice_coach.dart:236–240</code>). The
+      regression signature to watch on device stays: a guidance signal at a rest edge that waits
+      ~3.5s instead of firing on its normal latch timing.</li>
+    <li><b>Reminder adjacency:</b> "một" + reminder back-to-back at hold start is by design (count +
+      outcome co-occur at rep boundaries all over the fleet), but this particular pairing is new —
+      listen-check that it doesn't feel front-loaded on a 15s hold.</li>
+    <li><b>Hybrid layout on small phones:</b> centre rings + bottom rep hero + phase chevrons render
+      together for the first time; the existing collision comment (<code>:1863</code> — the rep hero
+      yields when signage collides) suggests the slots negotiate already, but portrait small-screen
+      needs an eyeball pass.</li>
+  </ul>
+  <p><b>Device stress-tests:</b> (1) full 3-hold set — the ritual loops cleanly, countdown re-arms from
+  "ba" after a deliberate mid-re-arm pose break; (2) stay planked through the rest — tone fires,
+  countdown starts immediately, zero other voice; (3) never re-pose, staying in frame — verified
+  NO coaching/instruction voice after the tone while the ring shows "Vào tư thế" indefinitely (the
+  accepted-risk state — also gauge how it feels), then drift out of frame — the safety guidance
+  line MUST fire, ungraced (the as-built safety exception); (4) faulted hold N — reminder lands right after "một" at hold N+1, never during the
+  rest; (5) hybrid — rings AND rep hero both visible portrait + landscape, hero ticks per completed
+  hold; (6) set-start unchanged — the widened gates didn't alter first-activation behaviour (intro
+  termination, grace close, ready line); (7) grace check — break body_in_frame during a rest/re-arm:
+  the guidance line must fire on its normal ungraced latch timing, not wait out any ~3.5s
+  window.</p>
+</section>
+
+<section>
+  <p class="kicker">08 · Pendings — ALL RESOLVED (Nam, 07-12; v4 refinement final)</p>
+  <h2>Nothing remains open</h2>
+  <table>
+    <tr><th>#</th><th>item (was)</th><th>FINAL</th></tr>
+    <tr><td>1</td><td>Rest-end tone listen-pick</td><td><b>My pick confirmed + landed:</b> <code>assets/audio/common/rest_end_tone.mp3</code> (candidate_192761, 1.0s ding). Codex adds no files.</td></tr>
+    <tr><td>2</td><td>Instruction line at re-entry</td><td><b>NONE (v4)</b> — the v3 <code>setup_position</code> reuse (and with it the skip-when-posed question and the ~10s voice re-tell) is superseded: the re-arm is voice-silent; the ring is the only instruction channel. Zero new recorded lines stands, now trivially.</td></tr>
+    <tr><td>3</td><td>Copy confirm at recording time</td><td><b>Moot for voice</b> — no voice line exists at the rest edge. Only the on-screen "Vào tư thế" ring label remains as UI copy, which stands as ruled (U3).</td></tr>
+    <tr><td>4</td><td>Guidance grace at re-arm</td><td><b>NONE (v4)</b> — mid-set guidance runs ungraced; set-START grace unchanged. Recorded as an explicit fence so "same machinery" can't silently import it (§04-D).</td></tr>
+  </table>
+  <p style="margin-top:16px"><b>Implementation — LANDED (07-12, uncommitted):</b> the addendum
+  (<code>docs/scratch/hold-rest-spec-addendum.md</code>, v4) was executed by Codex the same day —
+  analyze clean, 74 focused tests green; this doc is code-synced to that working tree. As-built
+  deviations (all accepted, marked AS BUILT in place): hybrid via orthogonal flags not the enum
+  (§05); safety guidance still speaks during re-arm, ungraced (§04-C); intro-termination structurally
+  <code>notActivated</code>-guarded (§04-D); Forearm Plank's string parser retained as its compat
+  path (§06 U2). Remaining: Nam's line review + the §07 device stress-tests.</p>
+</section>
+
+</main>
+</body>
+</html>

@@ -475,6 +475,10 @@ class VoicePolicy {
   }
 
   bool _praise(CueContext ctx) {
+    if (ctx.force) {
+      lastReason = 'praise-forced';
+      return true;
+    }
     if (_lastPraiseRep == ctx.repNumber - 1) {
       lastReason = 'praise-never-twice-in-a-row';
       return false; // Never twice in a row.
@@ -551,6 +555,10 @@ class VoicePolicy {
   }
 
   bool _hustle(CueContext ctx) {
+    if (ctx.force) {
+      lastReason = 'hustle-forced';
+      return true;
+    }
     if (!_canStartOutcome(CueType.hustle, ctx)) {
       return false;
     }

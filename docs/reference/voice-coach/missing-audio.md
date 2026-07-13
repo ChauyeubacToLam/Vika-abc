@@ -19,15 +19,13 @@ cue formula (external target + no-assumption fence), grounding steps, per-slot t
 (decisions.md 07-11 "Voice-copy skill"). Pending un-recorded lines below predate the formula;
 check them against it before recording.
 
-## Rep fleet Tier 1 gaps (07-11 code sync)
+## Rep fleet Tier 1 gaps (07-11 code sync) — ✅ RESOLVED 07-12
 
 Tier 1 reuses the resolver convention `assets/audio/<slug>/<fault_id>.mp3`; it did not add or rename
-audio. Two implemented detector groups currently resolve to safe no-ops:
-
-| Exercise | Implemented fault ids with no resolving MP3 | Why |
-|---|---|---|
-| Squat | `heel`, `depth`, `trunk`, `tempo`, `sync` | The old Squat stack used differently named WAV files. The generic resolver has no aliases for those fault keys. |
-| Ashtanga Namaskara | `hip`, `neck` | `assets/audio/ashtanga_namaskara/` contains no matching recordings. |
+audio. The two detector groups that resolved to safe no-ops are now covered (files on disk, verified
+07-12 against the master list): Squat `heel`/`depth`/`trunk`/`tempo`/`sync` and Ashtanga Namaskara
+`hip` (+ `neck_soft`; the critical `neck` line never plays — the cervical metric is always
+`affectsForm: false`, so its only voice surface is the `_soft` file).
 
 One implemented Russian Twist detector, `arm_swinging`, remains intentionally outside the script: no
 legacy id or audio meaning matches it closely enough. Bird Dog's `MissingBody` / `Plank` guard records
@@ -62,7 +60,14 @@ decision surface lives in `voice-fleet-tier1-review.html`.
 Everything the fleet needs, in one place: legacy re-records (old files predate the persona
 convention), the new soft lines, and the optional reminders. Supersedes the two earlier
 checklists ("Missing CRITICAL lines" + "Fleet Tier-1 SOFT cues"), whose wordings are folded in.
-Glute Bridge and all `common.*` files are DONE to convention — not listed.
+Glute Bridge and the pre-07-12 `common.*` files are DONE to convention — not listed (rows 167-170
+below are the NEW hold-pilot common files).
+
+**STATUS 07-12: every row in this table exists on disk** (verified via `generate.py` dry-run,
+skipped=all). Rows 1-166 were TTS-generated (Chi Mai, `tools/voice_tts/generate.py`); rows 167-178
+generated 07-12 (hold-pilot common keys + the four preview-tier yoga-pose intros). ALL TTS output
+is provisional — Nam's own recording at the same path is the upgrade, wording cells are the drafts
+spoken.
 
 Lines POLISHED 07-11 to the §3d copywriting craft (voice-research-rules.md): external-focus
 phrasing where it fits (verb + direction + concrete target — "đạp sàn" over "duỗi gối"), one
@@ -249,6 +254,18 @@ How to use:
 | 164 | plank_up_down/trunk.mp3 | Bạn siết bụng, giữ người thẳng nhé. | re-record |
 | 165 | plank_up_down/arm_extension.mp3 | Bạn chống thẳng tay khi lên nhé. | re-record |
 | 166 | plank_up_down/trunk_reminder.mp3 | Lần này bạn nhớ giữ người thẳng nhé. | reminder (opt.) |
+| 167 | common/time_halfway.mp3 | Được một nửa rồi! | ✅ TTS 07-12 — key `common.time.halfway`; NOT yet in `commonFiles` (resolves null until registered) |
+| 168 | common/time_10s_left.mp3 | Còn mười giây nữa thôi! | ✅ TTS 07-12 — key `common.time.10s_left`; NOT yet in `commonFiles` |
+| 169 | common/hold_push.mp3 | Cố lên, sắp xong rồi! | ✅ TTS 07-12 — key `common.hold_push`; NOT yet in `commonFiles` |
+| 170 | common/hold_push_final.mp3 | Lần cuối rồi, cố lên nào! | ✅ TTS 07-12 — key `common.hold_push_final`; NOT yet in `commonFiles` |
+| 171 | downward_dog/downward_dog.setup_position.mp3 | Bạn chống hai tay xuống sàn, đẩy hông lên cao thành chữ V ngược nhé. | ✅ TTS 07-12 (yoga onboard — intros only, see DO-NOT-record) |
+| 172 | downward_dog/downward_dog.active_intro.mp3 | Đẩy hông lên cao và ra sau, giữ lưng thẳng nhé. | ✅ TTS 07-12 |
+| 173 | low_lunge/low_lunge.setup_position.mp3 | Bạn bước một chân dài lên trước, hạ gối sau chạm sàn nhé. | ✅ TTS 07-12 |
+| 174 | low_lunge/low_lunge.active_intro.mp3 | Hạ hông xuống, hướng ngực lên và giữ tư thế nhé. | ✅ TTS 07-12 |
+| 175 | prayer_pose/prayer_pose.setup_position.mp3 | Bạn đứng thẳng, chắp hai tay trước ngực nhé. | ✅ TTS 07-12 |
+| 176 | prayer_pose/prayer_pose.active_intro.mp3 | Đứng yên, giữ lưng và đầu thẳng nhé. | ✅ TTS 07-12 |
+| 177 | raised_arms/raised_arms.setup_position.mp3 | Bạn đứng thẳng, vươn hai tay lên cao qua đầu nhé. | ✅ TTS 07-12 |
+| 178 | raised_arms/raised_arms.active_intro.mp3 | Vươn tay lên cao, hướng ngực lên trần và giữ tư thế nhé. | ✅ TTS 07-12 |
 
 ### DO NOT record (unreachable / unmapped — waste of a take)
 
@@ -257,6 +274,21 @@ How to use:
 - Bird Dog `opposite_side` / `alternate` / `hold` — cleared on rejected attempts before the
   adapter can speak them; `MissingBody` / `Plank` — unmapped guard records.
 - Russian Twist `arm_swinging` (unmapped) and `rom` (rejected half-twist writes no RepLog).
+- **Preview-tier yoga fault lines (07-12 audit)** — Downward Dog `spine`/`shoulder`/`leg`/`hip`,
+  Low Lunge `back_knee`/`depth`/`chest`/`cervical`/`knee_travel`, Prayer Pose
+  `posture`/`shoulder`/`drift`, Raised Arms `arms`/`cervical`/`lumbar`/`stability`. None are
+  speakable by the policy coach today: (a) these exercises don't override `liveFaults` (real-time
+  channel empty), and (b) their logged `FaultRecord.type` strings are PascalCase (`SpineRound`,
+  `CervicalDanger`, `LumbarOverextension`, `PostureStack`, `ShoulderShrug`, `ArmsLow`/`ElbowBent`,
+  `KneeTravel`) so `_isKnownFaultId` filters them against the snake_case script faultIds — same
+  mismatch class the High Plank spec fixed for its pilot. Several ids additionally have NO
+  FaultRecord at all (live-screen-feedback or rep-invalidation only: downward_dog `hip`, low_lunge
+  `back_knee`/`depth`/`chest`, prayer_pose `shoulder`/`drift`, raised_arms `stability`). Record
+  fault lines only AFTER a wiring pass; intros ARE recorded (rows 171-178).
+- **Surya Namaskar — nothing to record**: `createVoiceCoach() => null`; it speaks its own hardcoded
+  Vietnamese via ttsService (safety lines per pose already written in `safety_overrides.dart`).
+  Its script-map faultIds (`pose_wait`/`safety`/`sequence`/`breath`) are flow states, not
+  FaultRecords; `breath` is unmeasured (no data-honest line possible).
 
 ### Legacy files you can IGNORE (not spoken by the new system)
 
@@ -401,9 +433,12 @@ docs/scratch/setup-intro-voice-impl-spec.md): `glute_bridge.setup_position` +
 `glute_bridge.active_intro` (per-set intro), `common.ready` (activation edge), `common.set_complete`
 (completion), and `common/count_3/2/1.mp3` reused as the voiced "ba/hai/một" activation countdown.
 Listen-checks for Nam (content calls, not asset gaps):
-1. `set_complete.mp3` — the landed completion choice differs from legacy (`exercise_complete`); if the
-   recording implies a NEXT set, the single-set pilot should speak `common.exercise_complete` instead
-   (both are registered; one-line swap).
+1. ~~`set_complete.mp3` listen-check~~ MOOT 07-12: the spoken set-complete line is replaced by the
+   non-verbal END TONE (decisions.md "Hold voice round 2"; asset landed at
+   `assets/audio/common/end_tone.mp3`, Nam-picked, CC0 freesound.org/s/157277). The
+   `common/set_complete.mp3` recording stays on disk but goes UNWIRED — not a gap. RULED 07-12:
+   the exercise's LAST set speaks `common.exercise_complete` (already recorded) on top of the
+   tone; all other sets tone-only.
 2. count_3/2/1 — confirm the rep-count intonation reads as a countdown in context; re-record only if it
    sounds off.
 Note: `common/hold_still.mp3` is recorded but stays UNWIRED by design (holdStill has no instruction
